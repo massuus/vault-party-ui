@@ -1,0 +1,97 @@
+plugins {
+    id 'eclipse'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '5.1.+'
+}
+
+group = mod_group_id
+version = mod_version
+
+base {
+    archivesName = mod_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                vaultpartyui {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                vaultpartyui {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+            mods {
+                vaultpartyui {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+def vaultHuntersJar = file(providers.gradleProperty('vault_hunters_jar').orElse('C:/Users/samva/curseforge/minecraft/Instances/Vault Hunters Third Edition - Remastered/mods/the_vault-1.18.2-3.21.5-remastered.6574.jar').get())
+def vaultHuntersGroup = 'dev.copilot.vault'
+def vaultHuntersArtifact = 'the_vault'
+def vaultHuntersVersion = '1.18.2-3.21.5-remastered.6574'
+def vaultHuntersRepo = file("$rootDir/local-maven")
+
+if (!vaultHuntersJar.exists()) {
+    throw new GradleException("Vault Hunters jar not found at ${vaultHuntersJar}. Set -Pvault_hunters_jar to the mod jar path.")
+}
+
+repositories {
+    maven {
+        url = 'https://maven.minecraftforge.net'
+    }
+    maven {
+        url = uri(vaultHuntersRepo)
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    compileOnly fg.deobf("${vaultHuntersGroup}:${vaultHuntersArtifact}:${vaultHuntersVersion}")
+    runtimeOnly fg.deobf("${vaultHuntersGroup}:${vaultHuntersArtifact}:${vaultHuntersVersion}")
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+}
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_name,
+                'Specification-Vendor'    : 'Copilot',
+                'Specification-Version'   : '1',
+                'Implementation-Title'     : project.name,
+                'Implementation-Version'   : mod_version,
+                'Implementation-Vendor'    : 'Copilot',
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+}

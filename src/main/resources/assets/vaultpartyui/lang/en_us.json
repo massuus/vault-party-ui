@@ -1,0 +1,27 @@
+{
+  "key.vaultpartyui.open_party_ui": "Open Party UI",
+  "key.categories.vaultpartyui": "Vault Party UI",
+
+  "screen.vaultpartyui.title": "Party Manager",
+  "screen.vaultpartyui.party": "Your Party",
+  "screen.vaultpartyui.players": "Online Players",
+  "screen.vaultpartyui.target": "Player Name",
+  "screen.vaultpartyui.search_hint": "Type a name to filter or invite",
+  "screen.vaultpartyui.create": "Create Party",
+  "screen.vaultpartyui.leave": "Leave Party",
+  "screen.vaultpartyui.disband": "Disband Party",
+  "screen.vaultpartyui.list": "List Party",
+  "screen.vaultpartyui.invite_selected": "Invite Selected",
+  "screen.vaultpartyui.invite_nearby": "Invite Nearby",
+  "screen.vaultpartyui.invite_all": "Invite All",
+  "screen.vaultpartyui.remove_selected": "Remove Selected",
+  "screen.vaultpartyui.accept_invite": "Accept Invite",
+  "screen.vaultpartyui.decline_invite": "Decline Invite",
+  "screen.vaultpartyui.no_party": "You are not in a party.",
+  "screen.vaultpartyui.no_target": "Type or select a player name first.",
+  "screen.vaultpartyui.pending_invite": "Incoming invite from %s",
+  "screen.vaultpartyui.members": "Members",
+  "screen.vaultpartyui.online": "Online players",
+  "screen.vaultpartyui.leader": "Leader",
+  "screen.vaultpartyui.self": "You"
+}

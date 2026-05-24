@@ -1,0 +1,61 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "runClient",
+      "type": "shell",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": ["runClient"],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "runClientDebug",
+      "type": "shell",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": ["runClient", "--debug-jvm"],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "gradle-debug",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Listening for transport dt_socket at address: 5005"
+        }
+      }
+    }
+    ,
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": ["build"],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "deployToCurseForge",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\deploy.ps1",
+      "args": [],
+      "options": {
+        "shell": {
+          "executable": "powershell",
+          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "build-and-deploy",
+      "type": "shell",
+      "dependsOn": ["build", "deployToCurseForge"],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[40,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="vaultpartyui"
+version="${file.jarVersion}"
+displayName="Vault Party UI"
+authors="Massuus"
+description='''
+Adds a client-side party management screen for Vault Hunters 1.18.2.
+'''
+displayTest="IGNORE_ALL_VERSION"
+
+[[dependencies.vaultpartyui]]
+modId="forge"
+mandatory=true
+versionRange="[40,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.vaultpartyui]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.18.2,1.19)"
+ordering="NONE"
+side="CLIENT"
