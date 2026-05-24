@@ -53,7 +53,7 @@ minecraft {
 }
 
 def vaultHuntersJar = file(providers.gradleProperty('vault_hunters_jar').orElse('C:/Users/samva/curseforge/minecraft/Instances/Vault Hunters Third Edition - Remastered/mods/the_vault-1.18.2-3.21.5-remastered.6574.jar').get())
-def vaultHuntersGroup = 'dev.copilot.vault'
+def vaultHuntersGroup = 'dev.massuus.vault'
 def vaultHuntersArtifact = 'the_vault'
 def vaultHuntersVersion = '1.18.2-3.21.5-remastered.6574'
 def vaultHuntersRepo = file("$rootDir/local-maven")
@@ -86,11 +86,11 @@ jar {
     manifest {
         attributes([
                 'Specification-Title'     : mod_name,
-                'Specification-Vendor'    : 'Copilot',
+                'Specification-Vendor'    : 'Massuus',
                 'Specification-Version'   : '1',
                 'Implementation-Title'     : project.name,
                 'Implementation-Version'   : mod_version,
-                'Implementation-Vendor'    : 'Copilot',
+                'Implementation-Vendor'    : 'Massuus',
                 'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
