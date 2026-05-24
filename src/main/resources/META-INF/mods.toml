@@ -7,6 +7,7 @@ modId="vaultpartyui"
 version="${file.jarVersion}"
 displayName="Vault Party UI"
 authors="Massuus"
+logoFile="logo.png"
 description='''
 Adds a client-side party management screen for Vault Hunters 1.18.2.
 '''
