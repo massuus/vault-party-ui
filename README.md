@@ -11,6 +11,21 @@ Client-side Forge mod for Vault Hunters (Minecraft 1.18.2) that provides a party
 - Party member list panel.
 - Online player list with per-player `Invite` / `Remove` actions.
 
+## Changelog
+
+### 1.1.0
+
+- Added auto-accept invites toggle that works even when the screen is closed.
+- Added player heads beside party and online player names.
+- Improved row states, invite cooldown handling, and inline UI feedback.
+- Refined layout spacing and removed the extra filter button/context text.
+- Split party screen logic into helper classes to keep the screen file smaller.
+
+### 1.0.0
+
+- Initial release of the Vault Party UI.
+- Added the party management screen, keybind, and core invite/remove actions.
+
 ## Requirements
 
 - Minecraft `1.18.2`

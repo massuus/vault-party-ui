@@ -17,6 +17,11 @@
   "screen.vaultpartyui.remove_selected": "Remove Selected",
   "screen.vaultpartyui.accept_invite": "Accept Invite",
   "screen.vaultpartyui.decline_invite": "Decline Invite",
+  "screen.vaultpartyui.auto_accept_on": "Auto accept invites: On",
+  "screen.vaultpartyui.auto_accept_off": "Auto accept invites: Off",
+  "screen.vaultpartyui.auto_accepted": "Auto-accepted invite from %s",
+  "screen.vaultpartyui.toast_auto_accept_on": "Auto-accept enabled",
+  "screen.vaultpartyui.toast_auto_accept_off": "Auto-accept disabled",
   "screen.vaultpartyui.no_party": "You are not in a party.",
   "screen.vaultpartyui.no_target": "Type or select a player name first.",
   "screen.vaultpartyui.pending_invite": "Incoming invite from %s",
@@ -25,6 +30,19 @@
   "screen.vaultpartyui.leader": "Leader",
   "screen.vaultpartyui.invite": "Invite",
   "screen.vaultpartyui.remove": "Remove",
-  "screen.vaultpartyui.self": "You"
-  ,"screen.vaultpartyui.credit_tooltip": "Click to open the GitHub repo"
+  "screen.vaultpartyui.in_party": "In Other Party",
+  "screen.vaultpartyui.in_your_party": "In Party",
+  "screen.vaultpartyui.invited": "Invited",
+  "screen.vaultpartyui.already_in_party_local": "%s is already in another party.",
+  "screen.vaultpartyui.tip_invite": "Invite this player",
+  "screen.vaultpartyui.tip_remove": "Remove this member",
+  "screen.vaultpartyui.tip_member": "Only leader can remove members",
+  "screen.vaultpartyui.tip_other_party": "Player is already in another party",
+  "screen.vaultpartyui.tip_cooldown": "Invite recently sent",
+  "screen.vaultpartyui.tip_no_action": "Create or join a party to invite",
+  "screen.vaultpartyui.toast_invited": "Invited %s",
+  "screen.vaultpartyui.toast_removed": "Removed %s",
+  "screen.vaultpartyui.no_matching": "No matching players.",
+  "screen.vaultpartyui.self": "You",
+  "screen.vaultpartyui.credit_tooltip": "Click to open the GitHub repo"
 }

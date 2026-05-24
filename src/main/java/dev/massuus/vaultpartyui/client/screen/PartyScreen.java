@@ -3,6 +3,7 @@ package dev.massuus.vaultpartyui.client.screen;
 import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.massuus.vaultpartyui.client.ClientPartySettings;
 import iskallia.vault.client.data.ClientPartyData;
 import iskallia.vault.client.data.ClientPartyInviteState;
 import iskallia.vault.network.message.ServerboundPartyInviteResponseMessage;
@@ -24,20 +25,25 @@ import net.minecraft.util.Mth;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import org.lwjgl.glfw.GLFW;
 
 public class PartyScreen extends Screen {
     private static final int BUTTON_WIDTH = 90;
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 4;
-    private static final int PANEL_TOP = 100;
+    private static final int PANEL_TOP = 124;
     private static final int PANEL_HEIGHT = 155;
     private static final int PANEL_PADDING = 10;
     private static final int ONLINE_ROW_HEIGHT = 14;
     private static final int VISIBLE_ONLINE_ROWS = 8;
     private static final int HEAD_SIZE = 8;
+    private static final long INVITE_COOLDOWN_MS = 8000L;
+    private static final int STATE_REFRESH_INTERVAL_TICKS = 4;
 
     private final Screen parentScreen;
 
@@ -51,7 +57,12 @@ public class PartyScreen extends Screen {
     private Button inviteAllButton;
     private Button acceptInviteButton;
     private Button declineInviteButton;
+    private Button autoAcceptToggleButton;
     private int onlineScrollOffset;
+    private int selectedOnlineIndex = -1;
+    private int stateRefreshTicks;
+    private final Map<UUID, Long> inviteCooldownUntilMs = new HashMap<>();
+    private final List<UiToast> toasts = new ArrayList<>();
 
     public PartyScreen(Screen parentScreen) {
         super(new TranslatableComponent("screen.vaultpartyui.title"));
@@ -67,18 +78,23 @@ public class PartyScreen extends Screen {
         int rowWidth = BUTTON_WIDTH * 3 + BUTTON_GAP * 2;
         int rowX = centerX - rowWidth / 2;
 
-        this.createPartyButton = addRenderableWidget(new Button(rowX, 24, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.create"), button -> sendPartyCommand("party create")));
-        this.leavePartyButton = addRenderableWidget(new Button(rowX + BUTTON_WIDTH + BUTTON_GAP, 24, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave"), button -> sendPartyCommand("party leave")));
-        this.disbandPartyButton = addRenderableWidget(new Button(rowX + (BUTTON_WIDTH + BUTTON_GAP) * 2, 24, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband"), button -> sendPartyCommand("party disband")));
+        this.createPartyButton = addRenderableWidget(new Button(rowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.create"), button -> sendPartyCommand("party create")));
+        this.leavePartyButton = addRenderableWidget(new Button(rowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave"), button -> sendPartyCommand("party leave")));
+        this.disbandPartyButton = addRenderableWidget(new Button(rowX + (BUTTON_WIDTH + BUTTON_GAP) * 2, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband"), button -> sendPartyCommand("party disband")));
 
-        this.inviteNearbyButton = addRenderableWidget(new Button(centerX - BUTTON_WIDTH - (BUTTON_GAP / 2), 48, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby"), button -> sendPartyCommand("party invite nearby")));
-        this.inviteAllButton = addRenderableWidget(new Button(centerX + (BUTTON_GAP / 2), 48, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all"), button -> sendPartyCommand("party invite all")));
+        this.inviteNearbyButton = addRenderableWidget(new Button(centerX - BUTTON_WIDTH - (BUTTON_GAP / 2), 62, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby"), button -> sendPartyCommand("party invite nearby")));
+        this.inviteAllButton = addRenderableWidget(new Button(centerX + (BUTTON_GAP / 2), 62, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all"), button -> sendPartyCommand("party invite all")));
 
         int inviteButtonWidth = 140;
         int inviteButtonX = centerX - inviteButtonWidth - 4;
         int declineButtonX = centerX + 4;
-        this.acceptInviteButton = addRenderableWidget(new Button(inviteButtonX, 72, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.accept_invite"), button -> acceptPendingInvite()));
-        this.declineInviteButton = addRenderableWidget(new Button(declineButtonX, 72, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.decline_invite"), button -> declinePendingInvite()));
+        this.acceptInviteButton = addRenderableWidget(new Button(inviteButtonX, 90, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.accept_invite"), button -> acceptPendingInvite()));
+        this.declineInviteButton = addRenderableWidget(new Button(declineButtonX, 90, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.decline_invite"), button -> declinePendingInvite()));
+        this.autoAcceptToggleButton = addRenderableWidget(new Button(centerX - 95, 90, 190, BUTTON_HEIGHT, autoAcceptToggleLabel(), button -> {
+            ClientPartySettings.toggleAutoAcceptInvites();
+            updateAutoAcceptToggleLabel();
+            pushToast(new TranslatableComponent(ClientPartySettings.isAutoAcceptInvitesEnabled() ? "screen.vaultpartyui.toast_auto_accept_on" : "screen.vaultpartyui.toast_auto_accept_off"), 0xE3C38C);
+        }));
 
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
         int targetBoxWidth = panelWidth - PANEL_PADDING * 2;
@@ -93,7 +109,14 @@ public class PartyScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
-        rebuildState();
+        this.stateRefreshTicks++;
+        if (this.stateRefreshTicks >= STATE_REFRESH_INTERVAL_TICKS) {
+            this.stateRefreshTicks = 0;
+            rebuildState();
+        }
+
+        pruneTransientState();
+
         if (this.targetBox != null) {
             this.targetBox.tick();
         }
@@ -154,6 +177,8 @@ public class PartyScreen extends Screen {
             this.font.drawShadow(poseStack, tip, tipX, tipY, 0xFFFFFF);
         }
 
+        renderToasts(poseStack);
+
 
     }
 
@@ -194,7 +219,7 @@ public class PartyScreen extends Screen {
             return super.mouseScrolled(mouseX, mouseY, scrollDelta);
         }
 
-        List<OnlinePlayer> visiblePlayers = filteredOnlinePlayers();
+        List<OnlineRow> visiblePlayers = filteredOnlineRows();
         int maxOffset = Math.max(0, visiblePlayers.size() - VISIBLE_ONLINE_ROWS);
         if (maxOffset == 0) {
             return true;
@@ -210,21 +235,68 @@ public class PartyScreen extends Screen {
         this.minecraft.setScreen(this.parentScreen);
     }
 
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.targetBox != null && this.targetBox.isFocused()) {
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        List<OnlineRow> rows = filteredOnlineRows();
+        if (rows.isEmpty()) {
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_DOWN) {
+            if (this.selectedOnlineIndex < 0) {
+                this.selectedOnlineIndex = 0;
+            } else {
+                this.selectedOnlineIndex = Math.min(rows.size() - 1, this.selectedOnlineIndex + 1);
+            }
+            ensureSelectedRowVisible(rows.size());
+            return true;
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_UP) {
+            if (this.selectedOnlineIndex < 0) {
+                this.selectedOnlineIndex = rows.size() - 1;
+            } else {
+                this.selectedOnlineIndex = Math.max(0, this.selectedOnlineIndex - 1);
+            }
+            ensureSelectedRowVisible(rows.size());
+            return true;
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+            if (this.selectedOnlineIndex >= 0 && this.selectedOnlineIndex < rows.size()) {
+                performPrimaryRowAction(rows.get(this.selectedOnlineIndex));
+                return true;
+            }
+        }
+
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
     private void rebuildState() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
             this.currentParty = null;
             this.onlinePlayers = Collections.emptyList();
             this.onlineScrollOffset = 0;
+            this.selectedOnlineIndex = -1;
             return;
         }
 
         this.currentParty = ClientPartyData.getParty(minecraft.player.getUUID());
         this.onlinePlayers = gatherOnlinePlayers(minecraft.getConnection());
 
-        List<OnlinePlayer> visiblePlayers = filteredOnlinePlayers();
+        List<OnlineRow> visiblePlayers = filteredOnlineRows();
         int maxOffset = Math.max(0, visiblePlayers.size() - VISIBLE_ONLINE_ROWS);
         this.onlineScrollOffset = Mth.clamp(this.onlineScrollOffset, 0, maxOffset);
+        if (visiblePlayers.isEmpty()) {
+            this.selectedOnlineIndex = -1;
+        } else {
+            this.selectedOnlineIndex = Mth.clamp(this.selectedOnlineIndex, 0, visiblePlayers.size() - 1);
+        }
     }
 
     private List<OnlinePlayer> gatherOnlinePlayers(ClientPacketListener connection) {
@@ -263,6 +335,16 @@ public class PartyScreen extends Screen {
         return filtered;
     }
 
+    private List<OnlineRow> filteredOnlineRows() {
+        return PartyRosterService.buildRows(
+                filteredOnlinePlayers(),
+            FilterMode.ALL,
+                this.currentParty,
+                getLocalPlayerId(),
+                this.inviteCooldownUntilMs
+        );
+    }
+
     private void sendPartyCommand(String command) {
         Minecraft minecraft = Minecraft.getInstance();
         ClientPacketListener connection = minecraft.getConnection();
@@ -298,7 +380,7 @@ public class PartyScreen extends Screen {
     }
 
     private void updateInviteButtons() {
-        boolean hasInvite = ClientPartyInviteState.hasPendingInvite() && this.currentParty == null;
+        boolean hasInvite = ClientPartyInviteState.hasPendingInvite() && this.currentParty == null && !ClientPartySettings.isAutoAcceptInvitesEnabled();
         if (this.acceptInviteButton != null) {
             this.acceptInviteButton.visible = hasInvite;
         }
@@ -308,7 +390,7 @@ public class PartyScreen extends Screen {
     }
 
     private void updateActionVisibility() {
-        boolean inParty = this.currentParty != null;
+        boolean inParty = isLocalPlayerInParty();
         int centerX = this.width / 2;
 
         if (this.createPartyButton != null) {
@@ -336,7 +418,10 @@ public class PartyScreen extends Screen {
         if (this.inviteAllButton != null) {
             this.inviteAllButton.visible = inParty;
         }
-
+        if (this.autoAcceptToggleButton != null) {
+            this.autoAcceptToggleButton.visible = true;
+            this.autoAcceptToggleButton.active = true;
+        }
         // Keep the second action row centered as a pair.
         if (this.inviteNearbyButton != null && this.inviteAllButton != null) {
             int rowWidth = BUTTON_WIDTH * 2 + BUTTON_GAP;
@@ -346,6 +431,17 @@ public class PartyScreen extends Screen {
         }
 
         updateInviteButtons();
+        updateAutoAcceptToggleLabel();
+    }
+
+    private Component autoAcceptToggleLabel() {
+        return new TranslatableComponent(ClientPartySettings.isAutoAcceptInvitesEnabled() ? "screen.vaultpartyui.auto_accept_on" : "screen.vaultpartyui.auto_accept_off");
+    }
+
+    private void updateAutoAcceptToggleLabel() {
+        if (this.autoAcceptToggleButton != null) {
+            this.autoAcceptToggleButton.setMessage(autoAcceptToggleLabel());
+        }
     }
 
     private void renderPartyPanel(PoseStack poseStack, int panelX, int panelWidth, int mouseX, int mouseY) {
@@ -382,7 +478,7 @@ public class PartyScreen extends Screen {
                 color = statusColor(cachedMember.status);
             }
 
-            drawPlayerHead(poseStack, memberId, textX, textY + 1);
+            drawPlayerHead(poseStack, memberId, textX, textY);
             this.font.draw(poseStack, line.toString(), textX + HEAD_SIZE + 4, textY, color);
             textY += 14;
         }
@@ -390,16 +486,20 @@ public class PartyScreen extends Screen {
 
     private void renderOnlinePanel(PoseStack poseStack, int panelX, int panelWidth, int mouseX, int mouseY) {
         int textX = panelX + 10;
-        int boxWidth = panelWidth - 20;
         int listTop = PANEL_TOP + 48;
         int listHeight = VISIBLE_ONLINE_ROWS * ONLINE_ROW_HEIGHT + 6;
 
         fill(poseStack, panelX + 8, PANEL_TOP + 20, panelX + panelWidth - 8, PANEL_TOP + 42, 0xAA1A1A1A);
         this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.target").getString(), textX, PANEL_TOP + 24, 0xA0A0A0);
 
-        List<OnlinePlayer> visiblePlayers = filteredOnlinePlayers();
+        List<OnlineRow> visiblePlayers = filteredOnlineRows();
         int maxOffset = Math.max(0, visiblePlayers.size() - VISIBLE_ONLINE_ROWS);
         this.onlineScrollOffset = Mth.clamp(this.onlineScrollOffset, 0, maxOffset);
+        if (visiblePlayers.isEmpty()) {
+            this.selectedOnlineIndex = -1;
+        } else {
+            this.selectedOnlineIndex = Mth.clamp(this.selectedOnlineIndex, 0, visiblePlayers.size() - 1);
+        }
 
         int startIndex = this.onlineScrollOffset;
         int endIndex = Math.min(visiblePlayers.size(), startIndex + VISIBLE_ONLINE_ROWS);
@@ -408,35 +508,33 @@ public class PartyScreen extends Screen {
         fill(poseStack, panelX + 8, listTop, panelX + panelWidth - 8, listTop + 1, 0xFFE3C38C);
 
         if (visiblePlayers.isEmpty()) {
-            this.font.draw(poseStack, "No matching players.", textX, listTop + 6, 0xA0A0A0);
+            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.no_matching").getString(), textX, listTop + 6, 0xA0A0A0);
             return;
         }
 
         int rowY = listTop + 4;
         for (int index = startIndex; index < endIndex; index++) {
-            OnlinePlayer player = visiblePlayers.get(index);
+            OnlineRow row = visiblePlayers.get(index);
+            OnlinePlayer player = row.player;
             boolean hovered = mouseX >= panelX + 10 && mouseX <= panelX + panelWidth - 10 && mouseY >= rowY - 2 && mouseY < rowY + ONLINE_ROW_HEIGHT - 2;
-            int background = hovered ? 0x663C3122 : 0x00000000;
+            boolean selected = index == this.selectedOnlineIndex;
+            int background = RowPresentation.backgroundColor(row.state, hovered, selected);
             
             // draw player name and per-row action (invite/remove)
             this.fill(poseStack, panelX + 10, rowY - 2, panelX + panelWidth - 10, rowY + ONLINE_ROW_HEIGHT - 2, background);
-            drawPlayerHead(poseStack, player.id, panelX + 12, rowY + 1);
-            this.font.draw(poseStack, player.name, panelX + 12 + HEAD_SIZE + 4, rowY, 0xFFFFFF);
+            drawPlayerHead(poseStack, player.id, panelX + 12, rowY);
+            this.font.draw(poseStack, player.name, panelX + 12 + HEAD_SIZE + 4, rowY, RowPresentation.nameColor(row.state));
 
-            // skip drawing actions for self
-            if (!player.id.equals(getLocalPlayerId())) {
-                int actionX = panelX + panelWidth - 84;
-                boolean targetIsInParty = isPlayerInCurrentParty(player.id);
-                if (isLocalPlayerInParty()) {
-                    if (targetIsInParty) {
-                        // Remove button for current members, leader only
-                        if (isPartyLeader()) {
-                            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.remove").getString(), actionX, rowY, 0xE0A0A0);
-                        }
-                    } else {
-                        // Invite button for non-members, visible to any party member
-                        this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.invite").getString(), actionX, rowY, 0xA0E0A0);
-                    }
+            int actionX = panelX + panelWidth - 110;
+            Component action = RowPresentation.actionLabel(row, isPartyLeader());
+            if (action != null) {
+                this.font.draw(poseStack, action.getString(), actionX, rowY, RowPresentation.actionColor(row.state));
+            }
+
+            if (hovered) {
+                Component hint = RowPresentation.tooltip(row, isPartyLeader());
+                if (hint != null) {
+                    renderTooltip(poseStack, hint, mouseX, mouseY);
                 }
             }
 
@@ -462,70 +560,114 @@ public class PartyScreen extends Screen {
         int listTop = PANEL_TOP + 48;
         int relativeY = (int)mouseY - listTop - 4;
         int index = this.onlineScrollOffset + (relativeY / ONLINE_ROW_HEIGHT);
-        List<OnlinePlayer> visiblePlayers = filteredOnlinePlayers();
+        List<OnlineRow> visiblePlayers = filteredOnlineRows();
         if (index < 0 || index >= visiblePlayers.size()) {
             return false;
         }
 
-        OnlinePlayer player = visiblePlayers.get(index);
-        if (player.id.equals(getLocalPlayerId())) {
-            return false;
-        }
-        int actionX = panelX + ((this.width - 40 - PANEL_PADDING) / 2) - 84;
+        this.selectedOnlineIndex = index;
+
+        OnlineRow row = visiblePlayers.get(index);
+        OnlinePlayer player = row.player;
         int actionY = listTop + (index - this.onlineScrollOffset) * ONLINE_ROW_HEIGHT + 4;
-        // Use the same action bounds and logic as the renderer. The renderer places the action at
-        // panelX + panelWidth - 84. Recompute panelWidth here for clarity.
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
-        actionX = panelX + panelWidth - 84;
-        if (mouseX >= actionX && mouseX <= actionX + 70 && mouseY >= actionY && mouseY <= actionY + ONLINE_ROW_HEIGHT - 2) {
-            boolean targetIsInParty = isPlayerInCurrentParty(player.id);
-            if (isLocalPlayerInParty()) {
-                if (targetIsInParty) {
-                    if (isPartyLeader()) {
-                        sendPartyCommand("party remove " + player.name);
-                    }
-                } else {
-                    sendPartyCommand("party invite " + player.name);
-                }
-            }
+        int actionX = panelX + panelWidth - 110;
+        if (mouseX >= actionX && mouseX <= actionX + 104 && mouseY >= actionY && mouseY <= actionY + ONLINE_ROW_HEIGHT - 2) {
+            performPrimaryRowAction(row);
             return true;
         }
 
-        return false;
+        // Clicking anywhere on row selects it for keyboard action.
+        return true;
     }
 
     private boolean isPartyLeader() {
-        if (this.currentParty == null) return false;
-        UUID leader = this.currentParty.getLeader();
-        return leader != null && leader.equals(getLocalPlayerId());
+        return PartyRosterService.isPartyLeader(this.currentParty, getLocalPlayerId());
     }
 
     private boolean isLocalPlayerInParty() {
-        if (this.currentParty == null) return false;
-        UUID local = getLocalPlayerId();
-        if (local == null) return false;
-        UUID leader = this.currentParty.getLeader();
-        if (leader != null && leader.equals(local)) return true;
-        List<UUID> members = this.currentParty.getMembers();
-        if (members != null) {
-            for (UUID m : members) {
-                if (local.equals(m)) return true;
-            }
-        }
-        return false;
+        return PartyRosterService.isLocalPlayerInParty(this.currentParty, getLocalPlayerId());
     }
 
-    private boolean isPlayerInCurrentParty(UUID playerId) {
-        if (this.currentParty == null || playerId == null) return false;
-        UUID leader = this.currentParty.getLeader();
-        if (leader != null && leader.equals(playerId)) return true;
-        List<UUID> members = this.currentParty.getMembers();
-        if (members != null) {
-            for (UUID memberId : members) {
-                if (playerId.equals(memberId)) return true;
-            }
+    private boolean performPrimaryRowAction(OnlineRow row) {
+        if (row == null || row.player == null) return false;
+        OnlinePlayer player = row.player;
+        switch (row.state) {
+            case INVITEABLE:
+                sendPartyCommand("party invite " + player.name);
+                this.inviteCooldownUntilMs.put(player.id, System.currentTimeMillis() + INVITE_COOLDOWN_MS);
+                pushToast(new TranslatableComponent("screen.vaultpartyui.toast_invited", player.name), 0xA0E0A0);
+                return true;
+            case PARTY_MEMBER:
+                if (isPartyLeader()) {
+                    sendPartyCommand("party remove " + player.name);
+                    pushToast(new TranslatableComponent("screen.vaultpartyui.toast_removed", player.name), 0xE0A0A0);
+                    return true;
+                }
+                pushToast(new TranslatableComponent("screen.vaultpartyui.tip_member"), 0xE3C38C);
+                return false;
+            case OTHER_PARTY:
+                Component msg = new TranslatableComponent("screen.vaultpartyui.already_in_party_local", player.name);
+                showClientMessage(msg);
+                pushToast(msg, 0xE3C38C);
+                return false;
+            case COOLDOWN:
+                pushToast(new TranslatableComponent("screen.vaultpartyui.tip_cooldown"), 0xB0B0B0);
+                return false;
+            case NO_ACTION:
+                pushToast(new TranslatableComponent("screen.vaultpartyui.tip_no_action"), 0xB0B0B0);
+                return false;
+            default:
+                return false;
         }
-        return false;
+    }
+
+    private void ensureSelectedRowVisible(int rowCount) {
+        if (rowCount <= 0 || this.selectedOnlineIndex < 0) return;
+        if (this.selectedOnlineIndex < this.onlineScrollOffset) {
+            this.onlineScrollOffset = this.selectedOnlineIndex;
+        }
+        int maxVisible = this.onlineScrollOffset + VISIBLE_ONLINE_ROWS - 1;
+        if (this.selectedOnlineIndex > maxVisible) {
+            this.onlineScrollOffset = this.selectedOnlineIndex - VISIBLE_ONLINE_ROWS + 1;
+        }
+        int maxOffset = Math.max(0, rowCount - VISIBLE_ONLINE_ROWS);
+        this.onlineScrollOffset = Mth.clamp(this.onlineScrollOffset, 0, maxOffset);
+    }
+
+    private void pruneTransientState() {
+        long now = System.currentTimeMillis();
+        PartyRosterService.pruneCooldowns(this.inviteCooldownUntilMs, now);
+
+        this.toasts.removeIf(t -> t.expiresAt <= now);
+    }
+
+    private void pushToast(Component message, int color) {
+        if (message == null) return;
+        this.toasts.add(new UiToast(message, color, System.currentTimeMillis() + 2600L));
+        if (this.toasts.size() > 3) {
+            this.toasts.remove(0);
+        }
+    }
+
+    private void renderToasts(PoseStack poseStack) {
+        if (this.toasts.isEmpty()) return;
+        int y = 34;
+        for (UiToast toast : this.toasts) {
+            String text = toast.message.getString();
+            int w = this.font.width(text) + 10;
+            int x = this.width - w - 10;
+            fill(poseStack, x, y - 1, x + w, y + this.font.lineHeight + 3, 0xCC111111);
+            this.font.drawShadow(poseStack, text, x + 5, y + 1, toast.color);
+            y += this.font.lineHeight + 6;
+        }
+    }
+
+    private void showClientMessage(Component message) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null && message != null) {
+            minecraft.player.displayClientMessage(message, false);
+        }
     }
 
     private UUID getLocalPlayerId() {
@@ -616,13 +758,4 @@ public class PartyScreen extends Screen {
         }
     }
 
-    private static final class OnlinePlayer {
-        final UUID id;
-        final String name;
-
-        OnlinePlayer(UUID id, String name) {
-            this.id = id;
-            this.name = name;
-        }
-    }
 }
