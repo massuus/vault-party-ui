@@ -36,38 +36,26 @@ final class RowPresentation {
 
     static Component actionLabel(OnlineRow row, boolean isPartyLeader) {
         if (row == null) return null;
-        switch (row.state) {
-            case INVITEABLE:
-                return new TranslatableComponent("screen.vaultpartyui.invite");
-            case PARTY_MEMBER:
-                return isPartyLeader ? new TranslatableComponent("screen.vaultpartyui.remove") : new TranslatableComponent("screen.vaultpartyui.in_your_party");
-            case OTHER_PARTY:
-                return new TranslatableComponent("screen.vaultpartyui.in_party");
-            case COOLDOWN:
-                return new TranslatableComponent("screen.vaultpartyui.invited");
-            case SELF:
-                return new TranslatableComponent("screen.vaultpartyui.self");
-            default:
-                return null;
-        }
+        return switch (row.state) {
+            case INVITEABLE -> new TranslatableComponent("screen.vaultpartyui.invite");
+            case PARTY_MEMBER -> (isPartyLeader ? new TranslatableComponent("screen.vaultpartyui.remove") : new TranslatableComponent("screen.vaultpartyui.in_your_party"));
+            case OTHER_PARTY -> new TranslatableComponent("screen.vaultpartyui.in_party");
+            case COOLDOWN -> new TranslatableComponent("screen.vaultpartyui.invited");
+            case SELF -> new TranslatableComponent("screen.vaultpartyui.self");
+            default -> null;
+        };
     }
 
     static Component tooltip(OnlineRow row, boolean isPartyLeader) {
         if (row == null) return null;
-        switch (row.state) {
-            case INVITEABLE:
-                return new TranslatableComponent("screen.vaultpartyui.tip_invite");
-            case PARTY_MEMBER:
-                return isPartyLeader ? new TranslatableComponent("screen.vaultpartyui.tip_remove") : new TranslatableComponent("screen.vaultpartyui.tip_member");
-            case OTHER_PARTY:
-                return new TranslatableComponent("screen.vaultpartyui.tip_other_party");
-            case COOLDOWN:
-                return new TranslatableComponent("screen.vaultpartyui.tip_cooldown");
-            case NO_ACTION:
-                return new TranslatableComponent("screen.vaultpartyui.tip_no_action");
-            default:
-                return null;
-        }
+        return switch (row.state) {
+            case INVITEABLE -> new TranslatableComponent("screen.vaultpartyui.tip_invite");
+            case PARTY_MEMBER -> (isPartyLeader ? new TranslatableComponent("screen.vaultpartyui.tip_remove") : new TranslatableComponent("screen.vaultpartyui.tip_member"));
+            case OTHER_PARTY -> new TranslatableComponent("screen.vaultpartyui.tip_other_party");
+            case COOLDOWN -> new TranslatableComponent("screen.vaultpartyui.tip_cooldown");
+            case NO_ACTION -> new TranslatableComponent("screen.vaultpartyui.tip_no_action");
+            default -> null;
+        };
     }
 
     static Component favoriteTooltip(boolean favorite) {

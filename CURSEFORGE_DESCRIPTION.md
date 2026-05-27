@@ -2,6 +2,8 @@
 
 Vault Party UI is a client-side Forge mod for Vault Hunters 1.18.2 that adds a fast, focused party management screen. It reduces chat command spam and keeps the most common party actions in one place.
 
+By default press `I` to open the UI. It can be changed in the key-bind settings.
+
 ## Features
 
 *   Open a party UI with a keybind instead of typing `/party` commands by hand.
@@ -12,10 +14,13 @@ Vault Party UI is a client-side Forge mod for Vault Hunters 1.18.2 that adds a f
 *   Invite or remove players directly from the player list.
 *   Mark favorite players with a star and send favorite-only invites.
 *   Use an auto-accept invites toggle for faster party joins.
+*   Auto-accept can be set to off, favorites only, or all.
+*   Invite Favorites quick action for every available favorite player.
+*   Optional keybinds for create/invite-all, create/invite-favorites, and invite-nearby.
 
 ## Why use it?
 
-If you play Vault Hunters with friends, this mod makes party management much less annoying. Instead of constantly typing commands, you get a dedicated UI for the most common party actions, plus favorites and auto-accept to make repeated party setup faster.
+If you play Vault Hunters with friends, this mod makes party management much less annoying. Instead of constantly typing commands, you get a dedicated UI for the most common party actions, plus favorites, auto-accept and quick actions  make repeated party setup faster.
 
 ## Requirements
 
@@ -30,6 +35,15 @@ If you play Vault Hunters with friends, this mod makes party management much les
 *   For best results, test it inside the Vault Hunters pack client.
 
 ## Changelog
+
+### 1.3
+
+*   Added persisted auto-accept modes: off, favorites only, and all.
+*   Added optional keybinds for quick party actions.
+*   Added a confirmation dialog before disbanding a party.
+*   Added clickable version and creator credit links in the party screen.
+*   Added built-in website confirmation flow that closes correctly after open or cancel.
+*   Swapped the party member HP suffix for a heart glyph.
 
 ### 1.2.2
 

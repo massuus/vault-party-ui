@@ -1,13 +1,13 @@
 package dev.massuus.vaultpartyui.client.screen;
 
-import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
-import iskallia.vault.client.data.ClientPartyData;
-import iskallia.vault.world.data.VaultPartyData.Party;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
+import iskallia.vault.client.data.ClientPartyData;
+import iskallia.vault.world.data.VaultPartyData.Party;
 
 final class PartyRosterService {
     private PartyRosterService() {
@@ -115,19 +115,13 @@ final class PartyRosterService {
 
     private static int rowStatePriority(RowState state) {
         if (state == null) return 99;
-        switch (state) {
-            case INVITEABLE:
-                return 0;
-            case COOLDOWN:
-                return 1;
-            case PARTY_MEMBER:
-                return 2;
-            case OTHER_PARTY:
-                return 3;
-            case SELF:
-                return 4;
-            default:
-                return 5;
-        }
+        return switch (state) {
+            case INVITEABLE -> 0;
+            case COOLDOWN -> 1;
+            case PARTY_MEMBER -> 2;
+            case OTHER_PARTY -> 3;
+            case SELF -> 4;
+            default -> 5;
+        };
     }
 }

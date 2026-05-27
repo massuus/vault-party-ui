@@ -10,14 +10,20 @@ import iskallia.vault.client.data.ClientPartyInviteState;
 import iskallia.vault.network.message.ServerboundPartyInviteResponseMessage;
 import iskallia.vault.world.data.VaultPartyData.Party;
 import iskallia.vault.client.data.ClientPartyData.PartyMember;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.Font;
+import javax.annotation.Nonnull;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
@@ -31,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Objects;
 import org.lwjgl.glfw.GLFW;
 
 public class PartyScreen extends Screen {
@@ -46,6 +53,9 @@ public class PartyScreen extends Screen {
     private static final long INVITE_COOLDOWN_MS = 8000L;
     private static final int STATE_REFRESH_INTERVAL_TICKS = 4;
     private static final int STAR_SIZE = 8;
+    private static final String MOD_VERSION = "VPUI v1.3";
+    private static final String CURSEFORGE_URL = "https://www.curseforge.com/minecraft/mc-mods/vault-party-ui";
+    private static final String GITHUB_URL = "https://github.com/massuus/vault-party-ui";
 
     private final Screen parentScreen;
 
@@ -75,6 +85,7 @@ public class PartyScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        Objects.requireNonNull(this.font, "font");
         rebuildState();
 
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
@@ -88,7 +99,7 @@ public class PartyScreen extends Screen {
         int createX = this.width / 2 - BUTTON_WIDTH / 2;
         this.createPartyButton = addRenderableWidget(new Button(createX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.create"), button -> sendPartyCommand("party create")));
         this.leavePartyButton = addRenderableWidget(new Button(leftRowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave"), button -> sendPartyCommand("party leave")));
-        this.disbandPartyButton = addRenderableWidget(new Button(leftRowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband"), button -> sendPartyCommand("party disband")));
+        this.disbandPartyButton = addRenderableWidget(new Button(leftRowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband"), button -> confirmDisbandParty()));
 
         this.inviteNearbyButton = addRenderableWidget(new Button(rightRowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby"), button -> sendPartyCommand("party invite nearby")));
         this.inviteAllButton = addRenderableWidget(new Button(rightRowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all"), button -> sendPartyCommand("party invite all")));
@@ -98,16 +109,16 @@ public class PartyScreen extends Screen {
         // Position invite accept/decline to the left/right of the centered Create Party button, same vertical level
         this.acceptInviteButton = addRenderableWidget(new Button(createX - inviteButtonWidth - BUTTON_GAP, 34, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.accept_invite"), button -> acceptPendingInvite()));
         this.declineInviteButton = addRenderableWidget(new Button(createX + BUTTON_WIDTH + BUTTON_GAP, 34, inviteButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.decline_invite"), button -> declinePendingInvite()));
-        this.autoAcceptToggleButton = addRenderableWidget(new Button(20, this.height - BUTTON_HEIGHT - 8, 190, BUTTON_HEIGHT, autoAcceptToggleLabel(), button -> {
-            ClientPartySettings.toggleAutoAcceptInvites();
+        this.autoAcceptToggleButton = addRenderableWidget(new Button(20, this.height - BUTTON_HEIGHT - 8, 190, BUTTON_HEIGHT, Objects.requireNonNull(autoAcceptToggleLabel()), button -> {
+            ClientPartySettings.cycleAutoAcceptMode();
             updateAutoAcceptToggleLabel();
-            pushToast(new TranslatableComponent(ClientPartySettings.isAutoAcceptInvitesEnabled() ? "screen.vaultpartyui.toast_auto_accept_on" : "screen.vaultpartyui.toast_auto_accept_off"), 0xE3C38C);
+            pushToast(new TranslatableComponent(Objects.requireNonNull(ClientPartySettings.getAutoAcceptMode().getToastKey())), 0xE3C38C);
         }));
 
         int targetBoxWidth = panelWidth - PANEL_PADDING * 2;
-        this.targetBox = new EditBox(this.font, rightPanelX + PANEL_PADDING, PANEL_TOP + 18, targetBoxWidth, 20, new TranslatableComponent("screen.vaultpartyui.target"));
+        this.targetBox = new EditBox(Objects.requireNonNull(this.font), rightPanelX + PANEL_PADDING, PANEL_TOP + 18, targetBoxWidth, 20, new TranslatableComponent("screen.vaultpartyui.target"));
         this.targetBox.setMaxLength(64);
-        addRenderableWidget(this.targetBox);
+        addRenderableWidget(Objects.requireNonNull(this.targetBox));
 
         updateActionVisibility();
     }
@@ -130,7 +141,9 @@ public class PartyScreen extends Screen {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+    public void render(@Nonnull PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        Objects.requireNonNull(poseStack, "poseStack");
+        final Font font = Objects.requireNonNull(this.font, "font");
         this.renderBackground(poseStack);
 
         int leftPanelX = 20;
@@ -141,18 +154,18 @@ public class PartyScreen extends Screen {
         drawPanel(poseStack, leftPanelX, PANEL_TOP, panelWidth, PANEL_HEIGHT);
         drawPanel(poseStack, rightPanelX, PANEL_TOP, panelWidth, PANEL_HEIGHT);
 
-        this.drawCenteredString(poseStack, this.font, this.title, this.width / 2, 8, 0xFFFFFF);
-        this.drawCenteredString(poseStack, this.font, new TranslatableComponent("screen.vaultpartyui.party"), leftPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
-        this.drawCenteredString(poseStack, this.font, new TranslatableComponent("screen.vaultpartyui.players"), rightPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
+        GuiComponent.drawCenteredString(poseStack, font, Objects.requireNonNull(this.title), this.width / 2, 8, 0xFFFFFF);
+        GuiComponent.drawCenteredString(poseStack, font, new TranslatableComponent("screen.vaultpartyui.party"), leftPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
+        GuiComponent.drawCenteredString(poseStack, font, new TranslatableComponent("screen.vaultpartyui.players"), rightPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
 
         if (ClientPartyInviteState.hasPendingInvite()) {
             String inviterName = ClientPartyInviteState.getInviterName();
-            String inviteText = new TranslatableComponent("screen.vaultpartyui.pending_invite", inviterName == null ? "?" : inviterName).getString();
-            int noticeWidth = this.font.width(inviteText) + 14;
+            String inviteText = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.pending_invite", inviterName == null ? "?" : inviterName).getString());
+            int noticeWidth = font.width(inviteText) + 14;
             int noticeX = this.width / 2 - noticeWidth / 2;
             fill(poseStack, noticeX, panelBottom + 8, noticeX + noticeWidth, panelBottom + 26, 0xCC1D1D1D);
             fill(poseStack, noticeX, panelBottom + 8, noticeX + noticeWidth, panelBottom + 9, 0xFFE3C38C);
-            this.font.draw(poseStack, inviteText, noticeX + 7, panelBottom + 13, 0xFFFFFF);
+            font.draw(poseStack, inviteText, noticeX + 7, panelBottom + 13, 0xFFFFFF);
         }
 
         renderPartyPanel(poseStack, leftPanelX, panelWidth, mouseX, mouseY);
@@ -161,26 +174,46 @@ public class PartyScreen extends Screen {
         super.render(poseStack, mouseX, mouseY, partialTick);
 
         if (this.targetBox != null) {
-            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.target").getString(), this.targetBox.x, this.targetBox.y - 10, 0xA0A0A0);
+            String targetLabel = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.target").getString());
+            font.draw(poseStack, targetLabel, this.targetBox.x, this.targetBox.y - 10, 0xA0A0A0);
         }
 
-        // Credit (clickable)
+        // Version and credit (clickable) - right aligned
+        String version = Objects.requireNonNull(MOD_VERSION);
+        String sep = " | ";
         String credit = "Made by Massuus";
-        int creditX = this.width - this.font.width(credit) - 8;
-        int creditY = this.height - 18;
-        boolean creditHovered = mouseX >= creditX && mouseX <= creditX + this.font.width(credit) && mouseY >= creditY && mouseY <= creditY + this.font.lineHeight;
+        int versionW = font.width(version);
+        int sepW = font.width(sep);
+        int creditW = font.width(credit);
+        int totalW = versionW + sepW + creditW;
+        int rightPadding = 8;
+        int versionX = this.width - rightPadding - totalW;
+        int versionY = this.height - 18;
+        boolean versionHovered = mouseX >= versionX && mouseX <= versionX + versionW && mouseY >= versionY && mouseY <= versionY + font.lineHeight;
+        int versionColor = versionHovered ? 0xFFFFFF : 0xAAAAAA;
+        font.draw(poseStack, version, versionX, versionY, versionColor);
+        if (versionHovered) {
+            int underlineY = versionY + font.lineHeight;
+            fill(poseStack, versionX, underlineY, versionX + versionW, underlineY + 1, versionColor);
+        }
+
+        int sepX = versionX + versionW;
+        font.draw(poseStack, Objects.requireNonNull(sep), sepX, versionY, 0xAAAAAA);
+
+        int creditX = sepX + sepW;
+        int creditY = versionY;
+        boolean creditHovered = mouseX >= creditX && mouseX <= creditX + creditW && mouseY >= creditY && mouseY <= creditY + font.lineHeight;
         int creditColor = creditHovered ? 0xFFFFFF : 0xAAAAAA;
-        this.font.draw(poseStack, credit, creditX, creditY, creditColor);
-        // underline when hovered
+        font.draw(poseStack, Objects.requireNonNull(credit), creditX, creditY, creditColor);
         if (creditHovered) {
-            int underlineY = creditY + this.font.lineHeight;
-            fill(poseStack, creditX, underlineY, creditX + this.font.width(credit), underlineY + 1, creditColor);
+            int underlineY = creditY + font.lineHeight;
+            fill(poseStack, creditX, underlineY, creditX + creditW, underlineY + 1, creditColor);
             // tooltip
-            String tip = new TranslatableComponent("screen.vaultpartyui.credit_tooltip").getString();
-            int tipX = Math.min(this.width - 10 - this.font.width(tip), (int)mouseX + 8);
-            int tipY = creditY - this.font.lineHeight - 6;
-            fill(poseStack, tipX - 4, tipY - 2, tipX + this.font.width(tip) + 4, tipY + this.font.lineHeight + 2, 0xCC111111);
-            this.font.drawShadow(poseStack, tip, tipX, tipY, 0xFFFFFF);
+            String tip = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.credit_tooltip").getString());
+            int tipX = Math.min(this.width - 10 - font.width(tip), (int)mouseX + 8);
+            int tipY = creditY - font.lineHeight - 6;
+            fill(poseStack, tipX - 4, tipY - 2, tipX + font.width(tip) + 4, tipY + font.lineHeight + 2, 0xCC111111);
+            font.drawShadow(poseStack, tip, tipX, tipY, 0xFFFFFF);
         }
 
         renderToasts(poseStack);
@@ -190,15 +223,33 @@ public class PartyScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Check credit link click (bottom-right)
+        // Check version and credit clicks (bottom-right)
+        String version = MOD_VERSION;
+        String sep = " | ";
         String credit = "Made by Massuus";
-        int creditX = this.width - this.font.width(credit) - 8;
-        int creditY = this.height - 18;
+        int versionW = this.font.width(version);
+        int sepW = this.font.width(sep);
         int creditW = this.font.width(credit);
-        int creditH = 10;
+        int totalW = versionW + sepW + creditW;
+        int rightPadding = 8;
+        int versionX = this.width - rightPadding - totalW;
+        int versionY = this.height - 18;
+        int versionH = this.font.lineHeight;
+        if (mouseX >= versionX && mouseX <= versionX + versionW && mouseY >= versionY && mouseY <= versionY + versionH) {
+            try {
+                openUrl(CURSEFORGE_URL);
+            } catch (Exception ignored) {
+            }
+            return true;
+        }
+
+        int sepX = versionX + versionW;
+        int creditX = sepX + sepW;
+        int creditY = versionY;
+        int creditH = this.font.lineHeight;
         if (mouseX >= creditX && mouseX <= creditX + creditW && mouseY >= creditY && mouseY <= creditY + creditH) {
             try {
-                openUrl("https://github.com/massuus/vault-party-ui");
+                openUrl(GITHUB_URL);
             } catch (Exception ignored) {
             }
             return true;
@@ -238,7 +289,9 @@ public class PartyScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(this.parentScreen);
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(this.parentScreen);
+        }
     }
 
     @Override
@@ -385,8 +438,30 @@ public class PartyScreen extends Screen {
         }
     }
 
+    private void confirmDisbandParty() {
+        Minecraft mc = this.minecraft;
+        if (mc == null) {
+            return;
+        }
+
+        mc.setScreen(new ConfirmScreen(confirmed -> {
+            if (confirmed) {
+                sendPartyCommand("party disband");
+            }
+            if (mc != null) {
+                mc.setScreen(this);
+            }
+        },
+        new TranslatableComponent("screen.vaultpartyui.disband_confirm_title"),
+        new TranslatableComponent("screen.vaultpartyui.disband_confirm_message"),
+        new TranslatableComponent("screen.vaultpartyui.disband_confirm_yes"),
+        new TranslatableComponent("screen.vaultpartyui.disband_confirm_no")));
+    }
+
     private void updateInviteButtons() {
-        boolean hasInvite = ClientPartyInviteState.hasPendingInvite() && this.currentParty == null && !ClientPartySettings.isAutoAcceptInvitesEnabled();
+        boolean hasInvite = ClientPartyInviteState.hasPendingInvite()
+                && this.currentParty == null
+                && !ClientPartySettings.shouldAutoAcceptInvite(Minecraft.getInstance(), ClientPartyInviteState.getInviterName());
         if (this.acceptInviteButton != null) {
             this.acceptInviteButton.visible = hasInvite;
         }
@@ -458,27 +533,31 @@ public class PartyScreen extends Screen {
     }
 
     private Component autoAcceptToggleLabel() {
-        return new TranslatableComponent(ClientPartySettings.isAutoAcceptInvitesEnabled() ? "screen.vaultpartyui.auto_accept_on" : "screen.vaultpartyui.auto_accept_off");
+        return Objects.requireNonNull(new TranslatableComponent(Objects.requireNonNull(ClientPartySettings.getAutoAcceptMode().getLabelKey())));
     }
 
     private void updateAutoAcceptToggleLabel() {
         if (this.autoAcceptToggleButton != null) {
-            this.autoAcceptToggleButton.setMessage(autoAcceptToggleLabel());
+            this.autoAcceptToggleButton.setMessage(Objects.requireNonNull(autoAcceptToggleLabel()));
         }
     }
 
     private void renderPartyPanel(PoseStack poseStack, int panelX, int panelWidth, int mouseX, int mouseY) {
+        Objects.requireNonNull(poseStack, "poseStack");
+        final Font font = Objects.requireNonNull(this.font);
         int textX = panelX + 10;
         int textY = PANEL_TOP + 24;
 
         if (this.currentParty == null) {
-            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.no_party").getString(), textX, textY, 0xE0E0E0);
+            String noParty = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.no_party").getString());
+            font.draw(poseStack, noParty, textX, textY, 0xE0E0E0);
             return;
         }
 
         UUID leaderId = this.currentParty.getLeader();
         List<UUID> members = this.currentParty.getMembers();
-        this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.members").getString() + ": " + members.size(), textX, textY, 0xE0E0E0);
+        String membersText = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.members").getString()) + ": " + members.size();
+        font.draw(poseStack, membersText, textX, textY, 0xE0E0E0);
         textY += 16;
 
         for (UUID memberId : members) {
@@ -488,8 +567,8 @@ public class PartyScreen extends Screen {
             if (memberId.equals(leaderId)) {
                 line.append(" [").append(new TranslatableComponent("screen.vaultpartyui.leader").getString()).append("]");
             }
-            if (memberId.equals(getLocalPlayerId())) {
-                line.append(" [").append(new TranslatableComponent("screen.vaultpartyui.self").getString()).append("]");
+                if (memberId.equals(getLocalPlayerId())) {
+                line.append(" [").append(Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.self").getString())).append("]");
             }
 
             int color = 0xFFFFFF;
@@ -497,24 +576,28 @@ public class PartyScreen extends Screen {
                 if (cachedMember.status != PartyMember.Status.NORMAL) {
                     line.append(" - ").append(cachedMember.status.name());
                 }
-                line.append(" - ").append(formatHealth(cachedMember.healthPts)).append(" HP");
+                line.append(" - ").append(formatHealth(cachedMember.healthPts)).append(" \u2764");
                 color = statusColor(cachedMember.status);
             }
 
             drawPlayerHead(poseStack, memberId, textX, textY);
-            this.font.draw(poseStack, line.toString(), textX + HEAD_SIZE + 4, textY, color);
+            String lineText = Objects.requireNonNull(String.valueOf(line.toString()));
+            font.draw(poseStack, lineText, textX + HEAD_SIZE + 4, textY, color);
             textY += 14;
         }
     }
 
     private void renderOnlinePanel(PoseStack poseStack, int panelX, int panelWidth, int mouseX, int mouseY) {
+        Objects.requireNonNull(poseStack, "poseStack");
+        final Font font = Objects.requireNonNull(this.font);
         int textX = panelX + 10;
         int listTop = PANEL_TOP + 48;
         int panelBottom = PANEL_TOP + PANEL_HEIGHT;
         int listHeight = Math.min(VISIBLE_ONLINE_ROWS * ONLINE_ROW_HEIGHT + 6, Math.max(0, panelBottom - listTop - 8));
 
         fill(poseStack, panelX + 8, PANEL_TOP + 20, panelX + panelWidth - 8, PANEL_TOP + 42, 0xAA1A1A1A);
-        this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.target").getString(), textX, PANEL_TOP + 24, 0xA0A0A0);
+        String targetLabel = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.target").getString());
+        font.draw(poseStack, targetLabel, textX, PANEL_TOP + 24, 0xA0A0A0);
 
         List<OnlineRow> visiblePlayers = filteredOnlineRows();
         int maxOffset = Math.max(0, visiblePlayers.size() - VISIBLE_ONLINE_ROWS);
@@ -532,7 +615,8 @@ public class PartyScreen extends Screen {
         fill(poseStack, panelX + 8, listTop, panelX + panelWidth - 8, listTop + 1, 0xFFE3C38C);
 
         if (visiblePlayers.isEmpty()) {
-            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.no_matching").getString(), textX, listTop + 6, 0xA0A0A0);
+            String noMatching = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.no_matching").getString());
+            font.draw(poseStack, noMatching, textX, listTop + 6, 0xA0A0A0);
             return;
         }
 
@@ -545,34 +629,36 @@ public class PartyScreen extends Screen {
             int background = RowPresentation.backgroundColor(row.state, hovered, selected);
             
             // draw player name and per-row action (invite/remove)
-            this.fill(poseStack, panelX + 10, rowY - 2, panelX + panelWidth - 10, rowY + ONLINE_ROW_HEIGHT - 2, background);
+            GuiComponent.fill(poseStack, panelX + 10, rowY - 2, panelX + panelWidth - 10, rowY + ONLINE_ROW_HEIGHT - 2, background);
             int starX = panelX + 12;
             int starColor = row.favorite ? 0xFFD76A : 0xB0B0B0;
             boolean starHovered = isFavoriteToggleHovered(mouseX, mouseY, starX, rowY);
             if (starHovered) {
                 starColor = 0xFFFFFF;
             }
-            this.font.draw(poseStack, row.favorite ? "\u2605" : "\u2606", starX, rowY, starColor);
+            font.draw(poseStack, row.favorite ? "\u2605" : "\u2606", starX, rowY, starColor);
 
             drawPlayerHead(poseStack, player.id, starX + STAR_SIZE + 4, rowY);
 
             int actionX = panelX + panelWidth - 110;
             int nameX = starX + STAR_SIZE + 4 + HEAD_SIZE + 4;
             int nameWidth = Math.max(0, actionX - nameX - 8);
-            String displayName = this.font.plainSubstrByWidth(player.name, nameWidth);
-            this.font.draw(poseStack, displayName, nameX, rowY, RowPresentation.nameColor(row.state));
+            String safeName = player.name == null ? "" : player.name;
+            String displayName = font.plainSubstrByWidth(safeName, nameWidth);
+            font.draw(poseStack, Objects.requireNonNull(String.valueOf(displayName)), nameX, rowY, RowPresentation.nameColor(row.state));
 
             Component action = RowPresentation.actionLabel(row, isPartyLeader());
             if (action != null) {
-                this.font.draw(poseStack, action.getString(), actionX, rowY, RowPresentation.actionColor(row.state));
+                String actionText = Objects.requireNonNull(action.getString());
+                font.draw(poseStack, actionText, actionX, rowY, RowPresentation.actionColor(row.state));
             }
 
             if (starHovered) {
-                renderTooltip(poseStack, RowPresentation.favoriteTooltip(row.favorite), mouseX, mouseY);
+                renderTooltip(poseStack, Objects.requireNonNull(RowPresentation.favoriteTooltip(row.favorite)), mouseX, mouseY);
             } else if (hovered) {
                 Component hint = RowPresentation.tooltip(row, isPartyLeader());
                 if (hint != null) {
-                    renderTooltip(poseStack, hint, mouseX, mouseY);
+                    renderTooltip(poseStack, Objects.requireNonNull(hint), mouseX, mouseY);
                 }
             }
 
@@ -739,10 +825,11 @@ public class PartyScreen extends Screen {
     }
 
     private void renderToasts(PoseStack poseStack) {
+        Objects.requireNonNull(poseStack, "poseStack");
         if (this.toasts.isEmpty()) return;
         int y = 34;
         for (UiToast toast : this.toasts) {
-            String text = toast.message.getString();
+            String text = Objects.requireNonNull(toast.message.getString());
             int w = this.font.width(text) + 10;
             int x = this.width - w - 10;
             fill(poseStack, x, y - 1, x + w, y + this.font.lineHeight + 3, 0xCC111111);
@@ -783,7 +870,8 @@ public class PartyScreen extends Screen {
     }
 
     private void drawPlayerHead(PoseStack poseStack, UUID playerId, int x, int y) {
-        ResourceLocation skin = getPlayerSkin(playerId);
+        Objects.requireNonNull(poseStack, "poseStack");
+        ResourceLocation skin = Objects.requireNonNull(getPlayerSkin(playerId));
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.setShaderTexture(0, skin);
@@ -822,23 +910,29 @@ public class PartyScreen extends Screen {
     }
 
     private void drawPanel(PoseStack poseStack, int x, int y, int width, int height) {
+        Objects.requireNonNull(poseStack, "poseStack");
         fill(poseStack, x, y, x + width, y + height, 0xAA111111);
         fill(poseStack, x, y, x + width, y + 1, 0xFFE3C38C);
     }
 
     private void openUrl(String url) {
-        try {
-            java.awt.Desktop desktop = java.awt.Desktop.isDesktopSupported() ? java.awt.Desktop.getDesktop() : null;
-            if (desktop != null && desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
-                desktop.browse(new java.net.URI(url));
-                return;
-            }
-        } catch (Exception ignored) {
+        Minecraft mc = this.minecraft;
+        if (mc == null || url == null || url.isBlank()) {
+            return;
         }
 
-        // Do not attempt Runtime.exec fallbacks — these use Runtime.getRuntime() and
-        // are rejected by some moderation systems (e.g. CurseForge). If the AWT
-        // Desktop API is not available, silently fail to avoid using Runtime.
+        mc.setScreen(new ConfirmLinkScreen(accepted -> {
+            if (accepted) {
+                try {
+                    Util.getPlatform().openUri(url);
+                } catch (Exception ignored) {
+                }
+            }
+
+            if (mc != null) {
+                mc.setScreen(this);
+            }
+        }, url, false));
     }
 
 }

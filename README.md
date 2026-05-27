@@ -8,10 +8,22 @@ Client-side Forge mod for Vault Hunters (Minecraft 1.18.2) that provides a party
 - Create/leave/disband party actions.
 - Invite nearby/all actions.
 - Invite handling (accept/decline) when not already in a party.
+- Auto-accept modes: off, favorites only, or all.
 - Party member list panel.
 - Online player list with per-player `Invite` / `Remove` actions.
+- Invite Favorites quick action for every available favorite player.
+- Optional keybinds for create/invite-all, create/invite-favorites, and invite-nearby.
 
 ## Changelog
+
+### 1.3
+
+- Added persisted auto-accept modes: off, favorites only, and all.
+- Added optional keybinds for quick party actions.
+- Added a confirmation dialog before disbanding a party.
+- Added clickable version and creator credit links in the party screen.
+- Added built-in website confirmation flow that closes correctly after open or cancel.
+- Swapped the party member HP suffix for a heart glyph.
 
 ### 1.2.2
 
