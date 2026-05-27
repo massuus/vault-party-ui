@@ -1,34 +1,5 @@
 package dev.massuus.vaultpartyui.client.screen;
 
-import com.mojang.authlib.GameProfile;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
-import dev.massuus.vaultpartyui.client.ClientPartySettings;
-import iskallia.vault.client.data.ClientPartyData;
-import iskallia.vault.client.data.ClientPartyInviteState;
-import iskallia.vault.network.message.ServerboundPartyInviteResponseMessage;
-import iskallia.vault.world.data.VaultPartyData.Party;
-import iskallia.vault.client.data.ClientPartyData.PartyMember;
-import net.minecraft.Util;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.ConfirmLinkScreen;
-import net.minecraft.client.gui.screens.ConfirmScreen;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.resources.DefaultPlayerSkin;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.GuiComponent;
-import net.minecraft.client.gui.Font;
-import javax.annotation.Nonnull;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -36,9 +7,41 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import java.util.Objects;
+import java.util.UUID;
+
+import javax.annotation.Nonnull;
+
 import org.lwjgl.glfw.GLFW;
+
+import com.mojang.authlib.GameProfile;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+
+import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
+import dev.massuus.vaultpartyui.client.ClientPartySettings;
+import iskallia.vault.client.data.ClientPartyData;
+import iskallia.vault.client.data.ClientPartyData.PartyMember;
+import iskallia.vault.client.data.ClientPartyInviteState;
+import iskallia.vault.network.message.ServerboundPartyInviteResponseMessage;
+import iskallia.vault.world.data.VaultPartyData.Party;
+import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.resources.DefaultPlayerSkin;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 
 public class PartyScreen extends Screen {
     private static final int BUTTON_WIDTH = 90;

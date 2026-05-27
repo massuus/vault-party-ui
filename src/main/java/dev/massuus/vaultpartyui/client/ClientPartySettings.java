@@ -1,15 +1,14 @@
 package dev.massuus.vaultpartyui.client;
 
-import net.minecraftforge.fml.loading.FMLPaths;
-
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.PlayerInfo;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 public final class ClientPartySettings {
     private static final String FILE_NAME = "vaultpartyui-party-settings.txt";

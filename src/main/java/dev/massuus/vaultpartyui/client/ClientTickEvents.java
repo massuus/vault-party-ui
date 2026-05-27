@@ -1,15 +1,21 @@
 package dev.massuus.vaultpartyui.client;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Objects;
+import java.util.UUID;
+
+import com.mojang.authlib.GameProfile;
+
 import dev.massuus.vaultpartyui.VaultPartyUiMod;
+import dev.massuus.vaultpartyui.client.screen.PartyScreen;
 import iskallia.vault.client.data.ClientPartyData;
 import iskallia.vault.client.data.ClientPartyInviteState;
-import dev.massuus.vaultpartyui.client.screen.PartyScreen;
 import iskallia.vault.network.message.ServerboundPartyInviteResponseMessage;
 import iskallia.vault.world.data.VaultPartyData.Party;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TranslatableComponent;
@@ -17,11 +23,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.UUID;
-import java.util.Objects;
 
 @Mod.EventBusSubscriber(modid = VaultPartyUiMod.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class ClientTickEvents {

@@ -1,11 +1,13 @@
 package dev.massuus.vaultpartyui.client;
 
+import org.lwjgl.glfw.GLFW;
+
 import com.mojang.blaze3d.platform.InputConstants;
+
 import net.minecraft.client.KeyMapping;
 import net.minecraftforge.client.ClientRegistry;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import org.lwjgl.glfw.GLFW;
 
 public final class ClientKeyMappings {
     public static final KeyMapping OPEN_PARTY_UI = new KeyMapping(
