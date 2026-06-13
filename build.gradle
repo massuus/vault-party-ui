@@ -57,6 +57,7 @@ def vaultHuntersGroup = 'dev.massuus.vault'
 def vaultHuntersArtifact = 'the_vault'
 def vaultHuntersVersion = '1.18.2-3.21.5-remastered.6574'
 def vaultHuntersRepo = file("$rootDir/local-maven")
+def voiceChatJar = file(providers.gradleProperty('voicechat_jar').orElse('C:/Users/samva/curseforge/minecraft/Instances/Vault Hunters Third Edition - Remastered/mods/voicechat-forge-1.18.2-2.6.16.jar').get())
 
 if (!vaultHuntersJar.exists()) {
     throw new GradleException("Vault Hunters jar not found at ${vaultHuntersJar}. Set -Pvault_hunters_jar to the mod jar path.")
@@ -75,6 +76,9 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     compileOnly fg.deobf("${vaultHuntersGroup}:${vaultHuntersArtifact}:${vaultHuntersVersion}")
     runtimeOnly fg.deobf("${vaultHuntersGroup}:${vaultHuntersArtifact}:${vaultHuntersVersion}")
+    if (voiceChatJar.exists()) {
+        compileOnly files(voiceChatJar)
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {

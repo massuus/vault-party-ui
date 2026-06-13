@@ -20,6 +20,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 
 import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
 import dev.massuus.vaultpartyui.client.ClientPartySettings;
+import dev.massuus.vaultpartyui.client.ClientTickEvents;
+import dev.massuus.vaultpartyui.client.VoiceChatIntegration;
 import iskallia.vault.client.data.ClientPartyData;
 import iskallia.vault.client.data.ClientPartyData.PartyMember;
 import iskallia.vault.client.data.ClientPartyInviteState;
@@ -45,20 +47,31 @@ import net.minecraft.util.Mth;
 
 public class PartyScreen extends Screen {
     private static final int BUTTON_WIDTH = 90;
+    private static final int MANAGE_BUTTON_WIDTH = 82;
+    private static final int LEAVE_VOICE_BUTTON_WIDTH = 76;
+    private static final int BULK_VOICE_BUTTON_WIDTH = 190;
+    private static final int INVITE_BUTTON_WIDTH = 68;
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 4;
+    private static final int ACTION_GROUP_TOP = 18;
+    private static final int ACTION_BUTTON_Y = 30;
+    private static final int ACTION_GROUP_PADDING = 3;
     private static final int PANEL_TOP = 58;
     private static final int PANEL_HEIGHT = 246;
     private static final int PANEL_PADDING = 10;
     private static final int ONLINE_ROW_HEIGHT = 14;
     private static final int VISIBLE_ONLINE_ROWS = 15;
     private static final int HEAD_SIZE = 8;
+    private static final int VOICE_ICON_SIZE = 10;
+    private static final float VOICE_ICON_SCALE = VOICE_ICON_SIZE / 16.0F;
     private static final long INVITE_COOLDOWN_MS = 8000L;
     private static final int STATE_REFRESH_INTERVAL_TICKS = 4;
     private static final int STAR_SIZE = 8;
-    private static final String MOD_VERSION = "VPUI v1.3";
+    private static final int PARTY_ACTION_WIDTH = 96;
+    private static final String MOD_VERSION = "VPUI v1.4";
     private static final String CURSEFORGE_URL = "https://www.curseforge.com/minecraft/mc-mods/vault-party-ui";
     private static final String GITHUB_URL = "https://github.com/massuus/vault-party-ui";
+    private static final ResourceLocation VOICE_GROUP_ICON = new ResourceLocation("voicechat", "textures/icons/microphone.png");
 
     private final Screen parentScreen;
 
@@ -68,15 +81,19 @@ public class PartyScreen extends Screen {
     private Button createPartyButton;
     private Button leavePartyButton;
     private Button disbandPartyButton;
+    private Button leaveVoiceGroupButton;
     private Button inviteNearbyButton;
     private Button inviteAllButton;
     private Button inviteFavoritesButton;
+    private Button inviteVoiceGroupButton;
+    private Button invitePartyVoiceGroupButton;
     private Button acceptInviteButton;
     private Button declineInviteButton;
     private Button autoAcceptToggleButton;
     private int onlineScrollOffset;
     private int selectedOnlineIndex = -1;
     private int stateRefreshTicks;
+    private Component queuedTooltip;
     private final Map<UUID, Long> inviteCooldownUntilMs = new HashMap<>();
     private final List<UiToast> toasts = new ArrayList<>();
 
@@ -94,19 +111,22 @@ public class PartyScreen extends Screen {
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
         int leftPanelX = 20;
         int rightPanelX = leftPanelX + panelWidth + PANEL_PADDING;
-        int leftRowWidth = BUTTON_WIDTH * 2 + BUTTON_GAP;
-        int rightRowWidth = BUTTON_WIDTH * 3 + BUTTON_GAP * 2;
+        int leftRowWidth = MANAGE_BUTTON_WIDTH * 2 + LEAVE_VOICE_BUTTON_WIDTH + BUTTON_GAP * 2;
+        int rightRowWidth = INVITE_BUTTON_WIDTH * 4 + BUTTON_GAP * 3;
         int leftRowX = leftPanelX + panelWidth / 2 - leftRowWidth / 2;
         int rightRowX = rightPanelX + panelWidth / 2 - rightRowWidth / 2;
 
         int createX = this.width / 2 - BUTTON_WIDTH / 2;
-        this.createPartyButton = addRenderableWidget(new Button(createX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.create"), button -> sendPartyCommand("party create")));
-        this.leavePartyButton = addRenderableWidget(new Button(leftRowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave"), button -> sendPartyCommand("party leave")));
-        this.disbandPartyButton = addRenderableWidget(new Button(leftRowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband"), button -> confirmDisbandParty()));
+        this.createPartyButton = addRenderableWidget(new Button(createX, ACTION_BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.create"), button -> sendPartyCommand("party create")));
+        this.leavePartyButton = addRenderableWidget(new Button(leftRowX, ACTION_BUTTON_Y, MANAGE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave_short"), button -> sendPartyCommand("party leave")));
+        this.disbandPartyButton = addRenderableWidget(new Button(leftRowX + MANAGE_BUTTON_WIDTH + BUTTON_GAP, ACTION_BUTTON_Y, MANAGE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband_short"), button -> confirmDisbandParty()));
+        this.leaveVoiceGroupButton = addRenderableWidget(new Button(leftRowX + (MANAGE_BUTTON_WIDTH + BUTTON_GAP) * 2, ACTION_BUTTON_Y, LEAVE_VOICE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave_voice_short"), button -> leaveVoiceGroup()));
 
-        this.inviteNearbyButton = addRenderableWidget(new Button(rightRowX, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby"), button -> sendPartyCommand("party invite nearby")));
-        this.inviteAllButton = addRenderableWidget(new Button(rightRowX + BUTTON_WIDTH + BUTTON_GAP, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all"), button -> sendPartyCommand("party invite all")));
-        this.inviteFavoritesButton = addRenderableWidget(new Button(rightRowX + (BUTTON_WIDTH + BUTTON_GAP) * 2, 34, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_favorites"), button -> inviteFavoritePlayers()));
+        this.inviteNearbyButton = addRenderableWidget(new Button(rightRowX, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby_short"), button -> sendPartyCommand("party invite nearby")));
+        this.inviteAllButton = addRenderableWidget(new Button(rightRowX + INVITE_BUTTON_WIDTH + BUTTON_GAP, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all_short"), button -> sendPartyCommand("party invite all")));
+        this.inviteFavoritesButton = addRenderableWidget(new Button(rightRowX + (INVITE_BUTTON_WIDTH + BUTTON_GAP) * 2, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_favorites_short"), button -> inviteFavoritePlayers()));
+        this.inviteVoiceGroupButton = addRenderableWidget(new Button(rightRowX + (INVITE_BUTTON_WIDTH + BUTTON_GAP) * 3, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_voice_group_short"), button -> ClientTickEvents.triggerVoiceGroupPartyAction()));
+        this.invitePartyVoiceGroupButton = addRenderableWidget(new Button(20, this.height - BUTTON_HEIGHT * 2 - 12, BULK_VOICE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_party_voice_group"), button -> invitePartyToVoiceGroup()));
 
         int inviteButtonWidth = 140;
         // Position invite accept/decline to the left/right of the centered Create Party button, same vertical level
@@ -147,6 +167,7 @@ public class PartyScreen extends Screen {
     public void render(@Nonnull PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
         Objects.requireNonNull(poseStack, "poseStack");
         final Font font = Objects.requireNonNull(this.font, "font");
+        this.queuedTooltip = null;
         this.renderBackground(poseStack);
 
         int leftPanelX = 20;
@@ -156,9 +177,9 @@ public class PartyScreen extends Screen {
 
         drawPanel(poseStack, leftPanelX, PANEL_TOP, panelWidth, PANEL_HEIGHT);
         drawPanel(poseStack, rightPanelX, PANEL_TOP, panelWidth, PANEL_HEIGHT);
+        renderActionGroupOutlines(poseStack);
 
         GuiComponent.drawCenteredString(poseStack, font, Objects.requireNonNull(this.title), this.width / 2, 8, 0xFFFFFF);
-        GuiComponent.drawCenteredString(poseStack, font, new TranslatableComponent("screen.vaultpartyui.party"), leftPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
         GuiComponent.drawCenteredString(poseStack, font, new TranslatableComponent("screen.vaultpartyui.players"), rightPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
 
         if (ClientPartyInviteState.hasPendingInvite()) {
@@ -220,6 +241,7 @@ public class PartyScreen extends Screen {
         }
 
         renderToasts(poseStack);
+        renderQueuedTooltip(poseStack, mouseX, mouseY);
 
 
     }
@@ -263,6 +285,10 @@ public class PartyScreen extends Screen {
         }
 
         if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+
+        if (handlePartyPanelClick(mouseX, mouseY)) {
             return true;
         }
 
@@ -499,12 +525,23 @@ public class PartyScreen extends Screen {
         if (this.disbandPartyButton != null) {
             this.disbandPartyButton.visible = inParty;
         }
+        if (this.leaveVoiceGroupButton != null) {
+            this.leaveVoiceGroupButton.visible = inParty && VoiceChatIntegration.hasLocalVoiceGroup();
+            this.leaveVoiceGroupButton.active = this.leaveVoiceGroupButton.visible;
+        }
 
-        if (inParty && this.leavePartyButton != null && this.disbandPartyButton != null) {
-            int rowWidth = BUTTON_WIDTH * 2 + BUTTON_GAP;
+        if (inParty && this.leavePartyButton != null && this.disbandPartyButton != null && this.leaveVoiceGroupButton != null) {
+            boolean showLeaveVoice = this.leaveVoiceGroupButton.visible;
+            int rowWidth = MANAGE_BUTTON_WIDTH * 2 + BUTTON_GAP + (showLeaveVoice ? LEAVE_VOICE_BUTTON_WIDTH + BUTTON_GAP : 0);
             int rowX = leftPanelX + panelWidth / 2 - rowWidth / 2;
             this.leavePartyButton.x = rowX;
-            this.disbandPartyButton.x = rowX + BUTTON_WIDTH + BUTTON_GAP;
+            this.leavePartyButton.y = ACTION_BUTTON_Y;
+            this.disbandPartyButton.x = rowX + MANAGE_BUTTON_WIDTH + BUTTON_GAP;
+            this.disbandPartyButton.y = ACTION_BUTTON_Y;
+            if (showLeaveVoice) {
+                this.leaveVoiceGroupButton.x = this.disbandPartyButton.x + MANAGE_BUTTON_WIDTH + BUTTON_GAP;
+                this.leaveVoiceGroupButton.y = ACTION_BUTTON_Y;
+            }
         }
 
         if (this.inviteNearbyButton != null) {
@@ -517,22 +554,83 @@ public class PartyScreen extends Screen {
             this.inviteFavoritesButton.visible = inParty;
             this.inviteFavoritesButton.active = inParty && hasInviteableFavorites();
         }
+        if (this.inviteVoiceGroupButton != null) {
+            this.inviteVoiceGroupButton.visible = inParty && VoiceChatIntegration.hasLocalVoiceGroup();
+            this.inviteVoiceGroupButton.active = this.inviteVoiceGroupButton.visible && hasInviteableVoiceGroupPlayersForParty();
+        }
+        if (this.invitePartyVoiceGroupButton != null) {
+            this.invitePartyVoiceGroupButton.visible = inParty && VoiceChatIntegration.isVoiceChatLoaded();
+            this.invitePartyVoiceGroupButton.active = this.invitePartyVoiceGroupButton.visible && hasPartyMembersAvailableForVoiceInvite();
+        }
         if (this.autoAcceptToggleButton != null) {
             this.autoAcceptToggleButton.visible = true;
             this.autoAcceptToggleButton.active = true;
             this.autoAcceptToggleButton.x = 20;
             this.autoAcceptToggleButton.y = this.height - BUTTON_HEIGHT - 8;
         }
-        if (this.inviteNearbyButton != null && this.inviteAllButton != null && this.inviteFavoritesButton != null) {
-            int rowWidth = BUTTON_WIDTH * 3 + BUTTON_GAP * 2;
+        if (this.invitePartyVoiceGroupButton != null) {
+            this.invitePartyVoiceGroupButton.x = 20;
+            this.invitePartyVoiceGroupButton.y = this.height - BUTTON_HEIGHT * 2 - 12;
+            this.invitePartyVoiceGroupButton.setWidth(BULK_VOICE_BUTTON_WIDTH);
+        }
+        if (this.inviteNearbyButton != null && this.inviteAllButton != null && this.inviteFavoritesButton != null && this.inviteVoiceGroupButton != null) {
+            boolean showVoiceGroupButton = this.inviteVoiceGroupButton.visible;
+            int buttonCount = 3 + (showVoiceGroupButton ? 1 : 0);
+            int rowWidth = INVITE_BUTTON_WIDTH * buttonCount + BUTTON_GAP * (buttonCount - 1);
             int rowX = rightPanelX + panelWidth / 2 - rowWidth / 2;
             this.inviteNearbyButton.x = rowX;
-            this.inviteAllButton.x = rowX + BUTTON_WIDTH + BUTTON_GAP;
-            this.inviteFavoritesButton.x = rowX + (BUTTON_WIDTH + BUTTON_GAP) * 2;
+            this.inviteNearbyButton.y = ACTION_BUTTON_Y;
+            this.inviteAllButton.x = rowX + INVITE_BUTTON_WIDTH + BUTTON_GAP;
+            this.inviteAllButton.y = ACTION_BUTTON_Y;
+            this.inviteFavoritesButton.x = rowX + (INVITE_BUTTON_WIDTH + BUTTON_GAP) * 2;
+            this.inviteFavoritesButton.y = ACTION_BUTTON_Y;
+            int nextX = rowX + (INVITE_BUTTON_WIDTH + BUTTON_GAP) * 3;
+            if (showVoiceGroupButton) {
+                this.inviteVoiceGroupButton.x = nextX;
+                this.inviteVoiceGroupButton.y = ACTION_BUTTON_Y;
+            }
         }
 
         updateInviteButtons();
         updateAutoAcceptToggleLabel();
+    }
+
+    private void renderActionGroupOutlines(PoseStack poseStack) {
+        Objects.requireNonNull(poseStack, "poseStack");
+        if (!isLocalPlayerInParty()) {
+            return;
+        }
+
+        Button lastManageButton = this.leaveVoiceGroupButton != null && this.leaveVoiceGroupButton.visible
+                ? this.leaveVoiceGroupButton
+                : this.disbandPartyButton;
+        renderButtonGroupOutline(poseStack, this.leavePartyButton, lastManageButton, new TranslatableComponent("screen.vaultpartyui.manage_party"));
+
+        Button lastInviteButton = this.inviteVoiceGroupButton != null && this.inviteVoiceGroupButton.visible
+                ? this.inviteVoiceGroupButton
+                : this.inviteFavoritesButton;
+        renderButtonGroupOutline(poseStack, this.inviteNearbyButton, lastInviteButton, new TranslatableComponent("screen.vaultpartyui.invite_group"));
+    }
+
+    private void renderButtonGroupOutline(PoseStack poseStack, Button firstButton, Button lastButton, Component label) {
+        if (firstButton == null || lastButton == null || !firstButton.visible || !lastButton.visible) {
+            return;
+        }
+
+        int x1 = firstButton.x - ACTION_GROUP_PADDING;
+        int y1 = ACTION_GROUP_TOP;
+        int x2 = lastButton.x + lastButton.getWidth() + ACTION_GROUP_PADDING;
+        int y2 = ACTION_BUTTON_Y + BUTTON_HEIGHT + ACTION_GROUP_PADDING;
+        fill(poseStack, x1, y1, x2, y1 + 1, 0xFFE3C38C);
+        fill(poseStack, x1, y2, x2, y2 + 1, 0xFFE3C38C);
+        fill(poseStack, x1, y1, x1 + 1, y2 + 1, 0xFFE3C38C);
+        fill(poseStack, x2 - 1, y1, x2, y2 + 1, 0xFFE3C38C);
+        if (label != null) {
+            String text = Objects.requireNonNull(label.getString());
+            int labelX = x1 + (x2 - x1) / 2 - this.font.width(text) / 2;
+            fill(poseStack, labelX - 3, y1 - 4, labelX + this.font.width(text) + 3, y1 + 7, 0xFF111111);
+            this.font.draw(poseStack, text, labelX, y1 - 3, 0xE3C38C);
+        }
     }
 
     private Component autoAcceptToggleLabel() {
@@ -550,6 +648,7 @@ public class PartyScreen extends Screen {
         final Font font = Objects.requireNonNull(this.font);
         int textX = panelX + 10;
         int textY = PANEL_TOP + 24;
+        int panelBottom = PANEL_TOP + PANEL_HEIGHT - 8;
 
         if (this.currentParty == null) {
             String noParty = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.no_party").getString());
@@ -557,36 +656,95 @@ public class PartyScreen extends Screen {
             return;
         }
 
-        UUID leaderId = this.currentParty.getLeader();
-        List<UUID> members = this.currentParty.getMembers();
+        List<UUID> members = sortedPartyMembers();
         String membersText = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.members").getString()) + ": " + members.size();
         font.draw(poseStack, membersText, textX, textY, 0xE0E0E0);
         textY += 16;
 
         for (UUID memberId : members) {
-            String memberName = resolvePlayerName(memberId);
-            PartyMember cachedMember = ClientPartyData.getCachedMember(memberId);
-            StringBuilder line = new StringBuilder(memberName);
-            if (memberId.equals(leaderId)) {
-                line.append(" [").append(new TranslatableComponent("screen.vaultpartyui.leader").getString()).append("]");
+            if (textY + ONLINE_ROW_HEIGHT > panelBottom) {
+                return;
             }
-                if (memberId.equals(getLocalPlayerId())) {
-                line.append(" [").append(Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.self").getString())).append("]");
-            }
+            renderPartyMemberRow(poseStack, panelX, panelWidth, memberId, textY, mouseX, mouseY);
+            textY += ONLINE_ROW_HEIGHT;
+        }
 
-            int color = 0xFFFFFF;
-            if (cachedMember != null) {
-                if (cachedMember.status != PartyMember.Status.NORMAL) {
-                    line.append(" - ").append(cachedMember.status.name());
-                }
-                line.append(" - ").append(formatHealth(cachedMember.healthPts)).append(" \u2764");
-                color = statusColor(cachedMember.status);
-            }
-
-            drawPlayerHead(poseStack, memberId, textX, textY);
-            String lineText = Objects.requireNonNull(String.valueOf(line.toString()));
-            font.draw(poseStack, lineText, textX + HEAD_SIZE + 4, textY, color);
+        List<OnlineRow> voiceRows = voiceGroupRowsNotInParty();
+        if (!voiceRows.isEmpty() && textY + 24 <= panelBottom) {
+            textY += 8;
+            font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.voice_not_party"), textX, textY, 0xE3C38C);
             textY += 14;
+            for (OnlineRow row : voiceRows) {
+                if (textY + ONLINE_ROW_HEIGHT > panelBottom) {
+                    return;
+                }
+                renderVoiceNotPartyRow(poseStack, panelX, panelWidth, row, textY, mouseX, mouseY);
+                textY += ONLINE_ROW_HEIGHT;
+            }
+        }
+    }
+
+    private void renderPartyMemberRow(PoseStack poseStack, int panelX, int panelWidth, UUID memberId, int rowY, int mouseX, int mouseY) {
+        int rowLeft = panelX + 10;
+        int rowRight = panelX + panelWidth - 10;
+        boolean hovered = mouseX >= rowLeft && mouseX <= rowRight && mouseY >= rowY - 2 && mouseY < rowY + ONLINE_ROW_HEIGHT - 2;
+        if (hovered) {
+            fill(poseStack, rowLeft, rowY - 2, rowRight, rowY + ONLINE_ROW_HEIGHT - 2, 0x663C3122);
+        }
+
+        int x = rowLeft + 2;
+        boolean inVoiceGroup = VoiceChatIntegration.isPlayerInLocalVoiceGroup(memberId);
+        if (inVoiceGroup) {
+            drawVoiceGroupIcon(poseStack, x, rowY - 1);
+            x += VOICE_ICON_SIZE + 3;
+        }
+        drawPlayerHead(poseStack, memberId, x, rowY);
+        x += HEAD_SIZE + 4;
+
+        String lineText = partyMemberLine(memberId);
+        int actionX = partyPanelActionX(panelX, panelWidth);
+        int nameWidth = Math.max(0, actionX - x - 6);
+        this.font.draw(poseStack, this.font.plainSubstrByWidth(lineText, nameWidth), x, rowY, partyMemberColor(memberId));
+
+        if (canInvitePartyMemberToVoice(memberId)) {
+            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.invite_to_voice"), actionX, rowY, 0xA0E0A0);
+            if (isPartyActionHovered(mouseX, mouseY, actionX, rowY)) {
+                queueTooltip(new TranslatableComponent("screen.vaultpartyui.tip_invite_to_voice"));
+            }
+        } else if (canJoinPartyMemberVoiceGroup(memberId)) {
+            this.font.draw(poseStack, new TranslatableComponent("screen.vaultpartyui.join_voice_group"), actionX, rowY, 0xA0E0A0);
+            if (isPartyActionHovered(mouseX, mouseY, actionX, rowY)) {
+                queueTooltip(new TranslatableComponent("screen.vaultpartyui.tip_join_voice_group"));
+            }
+        }
+    }
+
+    private void renderVoiceNotPartyRow(PoseStack poseStack, int panelX, int panelWidth, OnlineRow row, int rowY, int mouseX, int mouseY) {
+        int rowLeft = panelX + 10;
+        int rowRight = panelX + panelWidth - 10;
+        boolean hovered = mouseX >= rowLeft && mouseX <= rowRight && mouseY >= rowY - 2 && mouseY < rowY + ONLINE_ROW_HEIGHT - 2;
+        if (hovered) {
+            fill(poseStack, rowLeft, rowY - 2, rowRight, rowY + ONLINE_ROW_HEIGHT - 2, 0x663C3122);
+        }
+
+        int x = rowLeft + 2;
+        drawVoiceGroupIcon(poseStack, x, rowY - 1);
+        x += VOICE_ICON_SIZE + 3;
+        drawPlayerHead(poseStack, row.player.id, x, rowY);
+        x += HEAD_SIZE + 4;
+
+        int actionX = partyPanelActionX(panelX, panelWidth);
+        int nameWidth = Math.max(0, actionX - x - 6);
+        this.font.draw(poseStack, this.font.plainSubstrByWidth(row.player.name, nameWidth), x, rowY, RowPresentation.nameColor(row.state));
+
+        Component action = row.state == RowState.INVITEABLE
+                ? new TranslatableComponent("screen.vaultpartyui.invite_to_party")
+                : RowPresentation.actionLabel(row, isPartyLeader());
+        if (action != null) {
+            this.font.draw(poseStack, action.getString(), actionX, rowY, RowPresentation.actionColor(row.state));
+            if (row.state == RowState.INVITEABLE && isPartyActionHovered(mouseX, mouseY, actionX, rowY)) {
+                queueTooltip(new TranslatableComponent("screen.vaultpartyui.tip_invite_to_party"));
+            }
         }
     }
 
@@ -641,10 +799,18 @@ public class PartyScreen extends Screen {
             }
             font.draw(poseStack, row.favorite ? "\u2605" : "\u2606", starX, rowY, starColor);
 
-            drawPlayerHead(poseStack, player.id, starX + STAR_SIZE + 4, rowY);
-
             int actionX = panelX + panelWidth - 110;
-            int nameX = starX + STAR_SIZE + 4 + HEAD_SIZE + 4;
+            int headX = starX + STAR_SIZE + 4;
+            boolean inVoiceGroup = VoiceChatIntegration.isPlayerInLocalVoiceGroup(player.id);
+            int voiceIconX = headX;
+            int voiceIconY = rowY - 1;
+            if (inVoiceGroup) {
+                drawVoiceGroupIcon(poseStack, voiceIconX, voiceIconY);
+                headX += VOICE_ICON_SIZE + 3;
+            }
+            drawPlayerHead(poseStack, player.id, headX, rowY);
+
+            int nameX = headX + HEAD_SIZE + 4;
             int nameWidth = Math.max(0, actionX - nameX - 8);
             String safeName = player.name == null ? "" : player.name;
             String displayName = font.plainSubstrByWidth(safeName, nameWidth);
@@ -656,16 +822,29 @@ public class PartyScreen extends Screen {
                 font.draw(poseStack, actionText, actionX, rowY, RowPresentation.actionColor(row.state));
             }
 
+            boolean voiceIconHovered = inVoiceGroup && mouseX >= voiceIconX && mouseX <= voiceIconX + VOICE_ICON_SIZE && mouseY >= voiceIconY && mouseY <= voiceIconY + VOICE_ICON_SIZE;
             if (starHovered) {
-                renderTooltip(poseStack, Objects.requireNonNull(RowPresentation.favoriteTooltip(row.favorite)), mouseX, mouseY);
+                queueTooltip(Objects.requireNonNull(RowPresentation.favoriteTooltip(row.favorite)));
+            } else if (voiceIconHovered) {
+                queueTooltip(new TranslatableComponent("screen.vaultpartyui.tip_voice_group_member"));
             } else if (hovered) {
                 Component hint = RowPresentation.tooltip(row, isPartyLeader());
                 if (hint != null) {
-                    renderTooltip(poseStack, Objects.requireNonNull(hint), mouseX, mouseY);
+                    queueTooltip(Objects.requireNonNull(hint));
                 }
             }
 
             rowY += ONLINE_ROW_HEIGHT;
+        }
+    }
+
+    private void queueTooltip(Component tooltip) {
+        this.queuedTooltip = tooltip;
+    }
+
+    private void renderQueuedTooltip(PoseStack poseStack, int mouseX, int mouseY) {
+        if (this.queuedTooltip != null) {
+            renderTooltip(poseStack, this.queuedTooltip, mouseX, mouseY);
         }
     }
 
@@ -715,8 +894,194 @@ public class PartyScreen extends Screen {
         return true;
     }
 
+    private boolean handlePartyPanelClick(double mouseX, double mouseY) {
+        if (this.currentParty == null || !isInsidePartyPanel(mouseX, mouseY)) {
+            return false;
+        }
+
+        int leftPanelX = 20;
+        int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
+        int actionX = partyPanelActionX(leftPanelX, panelWidth);
+        if (mouseX < actionX || mouseX > actionX + PARTY_ACTION_WIDTH) {
+            return true;
+        }
+
+        int rowY = PANEL_TOP + 40;
+        for (UUID memberId : sortedPartyMembers()) {
+            if (mouseY >= rowY - 2 && mouseY <= rowY + ONLINE_ROW_HEIGHT - 2) {
+                if (canInvitePartyMemberToVoice(memberId)) {
+                    invitePlayerToVoiceGroup(memberId);
+                } else if (canJoinPartyMemberVoiceGroup(memberId)) {
+                    joinPartyMemberVoiceGroup(memberId);
+                }
+                return true;
+            }
+            rowY += ONLINE_ROW_HEIGHT;
+        }
+
+        List<OnlineRow> voiceRows = voiceGroupRowsNotInParty();
+        if (!voiceRows.isEmpty()) {
+            rowY += 22;
+            for (OnlineRow row : voiceRows) {
+                if (mouseY >= rowY - 2 && mouseY <= rowY + ONLINE_ROW_HEIGHT - 2) {
+                    if (row.state == RowState.INVITEABLE) {
+                        performPrimaryRowAction(row);
+                    }
+                    return true;
+                }
+                rowY += ONLINE_ROW_HEIGHT;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean isInsidePartyPanel(double mouseX, double mouseY) {
+        int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
+        return mouseX >= 20 + 8 && mouseX <= 20 + panelWidth - 8 && mouseY >= PANEL_TOP && mouseY <= PANEL_TOP + PANEL_HEIGHT;
+    }
+
+    private int partyPanelActionX(int panelX, int panelWidth) {
+        return panelX + panelWidth - PARTY_ACTION_WIDTH - 14;
+    }
+
+    private boolean isPartyActionHovered(int mouseX, int mouseY, int actionX, int rowY) {
+        return mouseX >= actionX && mouseX <= actionX + PARTY_ACTION_WIDTH && mouseY >= rowY - 2 && mouseY <= rowY + ONLINE_ROW_HEIGHT - 2;
+    }
+
     private boolean isPartyLeader() {
         return PartyRosterService.isPartyLeader(this.currentParty, getLocalPlayerId());
+    }
+
+    private List<UUID> sortedPartyMembers() {
+        if (this.currentParty == null || this.currentParty.getMembers() == null) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> members = new ArrayList<>(this.currentParty.getMembers());
+        members.sort((a, b) -> {
+            int voiceCompare = Boolean.compare(VoiceChatIntegration.isPlayerInLocalVoiceGroup(b), VoiceChatIntegration.isPlayerInLocalVoiceGroup(a));
+            if (voiceCompare != 0) {
+                return voiceCompare;
+            }
+            int anyVoiceCompare = Boolean.compare(VoiceChatIntegration.getPlayerVoiceGroupId(b) != null, VoiceChatIntegration.getPlayerVoiceGroupId(a) != null);
+            if (anyVoiceCompare != 0) {
+                return anyVoiceCompare;
+            }
+            return resolvePlayerName(a).compareToIgnoreCase(resolvePlayerName(b));
+        });
+        return members;
+    }
+
+    private List<OnlineRow> voiceGroupRowsNotInParty() {
+        if (this.currentParty == null || this.onlinePlayers.isEmpty() || !VoiceChatIntegration.hasLocalVoiceGroup()) {
+            return Collections.emptyList();
+        }
+
+        List<OnlinePlayer> players = new ArrayList<>();
+        for (OnlinePlayer player : this.onlinePlayers) {
+            if (player == null || player.id == null) {
+                continue;
+            }
+            if (VoiceChatIntegration.isPlayerInLocalVoiceGroup(player.id) && !PartyRosterService.isPlayerInCurrentParty(this.currentParty, player.id)) {
+                players.add(player);
+            }
+        }
+
+        return PartyRosterService.buildRows(
+                players,
+                FilterMode.ALL,
+                this.currentParty,
+                getLocalPlayerId(),
+                this.inviteCooldownUntilMs
+        );
+    }
+
+    private String partyMemberLine(UUID memberId) {
+        String memberName = resolvePlayerName(memberId);
+        StringBuilder line = new StringBuilder(memberName);
+        if (memberId != null && memberId.equals(this.currentParty.getLeader())) {
+            line.append(" [").append(new TranslatableComponent("screen.vaultpartyui.leader").getString()).append("]");
+        }
+        if (memberId != null && memberId.equals(getLocalPlayerId())) {
+            line.append(" [").append(Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.self").getString())).append("]");
+        }
+
+        PartyMember cachedMember = ClientPartyData.getCachedMember(memberId);
+        if (cachedMember != null) {
+            if (cachedMember.status != PartyMember.Status.NORMAL) {
+                line.append(" - ").append(cachedMember.status.name());
+            }
+            line.append(" - ").append(formatHealth(cachedMember.healthPts)).append(" \u2764");
+        }
+        return line.toString();
+    }
+
+    private int partyMemberColor(UUID memberId) {
+        PartyMember cachedMember = ClientPartyData.getCachedMember(memberId);
+        return cachedMember == null ? 0xFFFFFF : statusColor(cachedMember.status);
+    }
+
+    private boolean canInvitePartyMemberToVoice(UUID memberId) {
+        if (memberId == null || memberId.equals(getLocalPlayerId())) {
+            return false;
+        }
+        return VoiceChatIntegration.isVoiceChatLoaded()
+                && VoiceChatIntegration.hasLocalVoiceGroup()
+                && !VoiceChatIntegration.isPlayerInLocalVoiceGroup(memberId)
+                && findOnlinePlayer(memberId) != null;
+    }
+
+    private boolean canJoinPartyMemberVoiceGroup(UUID memberId) {
+        if (memberId == null || memberId.equals(getLocalPlayerId())) {
+            return false;
+        }
+        return VoiceChatIntegration.isVoiceChatLoaded()
+                && !VoiceChatIntegration.hasLocalVoiceGroup()
+                && VoiceChatIntegration.getPlayerVoiceGroupId(memberId) != null
+                && findOnlinePlayer(memberId) != null;
+    }
+
+    private void invitePlayerToVoiceGroup(UUID playerId) {
+        OnlinePlayer player = findOnlinePlayer(playerId);
+        if (player == null) {
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_no_party_voice_invites"), 0xB0B0B0);
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) {
+            minecraft.player.chat("/voicechat invite " + player.name);
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_invited_to_voice", player.name), 0xA0E0A0);
+        }
+    }
+
+    private void joinPartyMemberVoiceGroup(UUID playerId) {
+        OnlinePlayer player = findOnlinePlayer(playerId);
+        UUID groupId = VoiceChatIntegration.getPlayerVoiceGroupId(playerId);
+        if (player == null || groupId == null) {
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_no_joinable_voice_group"), 0xB0B0B0);
+            return;
+        }
+
+        boolean sent = VoiceChatIntegration.joinVoiceGroup(groupId, null);
+        if (sent) {
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_joining_voice_group", player.name), 0xA0E0A0);
+        } else {
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_join_voice_group_failed"), 0xB0B0B0);
+        }
+    }
+
+    private OnlinePlayer findOnlinePlayer(UUID playerId) {
+        if (playerId == null) {
+            return null;
+        }
+        for (OnlinePlayer player : this.onlinePlayers) {
+            if (player != null && playerId.equals(player.id)) {
+                return player;
+            }
+        }
+        return null;
     }
 
     private boolean hasInviteableFavorites() {
@@ -730,6 +1095,37 @@ public class PartyScreen extends Screen {
 
         for (OnlineRow row : rows) {
             if (row.favorite && row.state == RowState.INVITEABLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasInviteableVoiceGroupPlayersForParty() {
+        for (OnlineRow row : voiceGroupRowsNotInParty()) {
+            if (row.state == RowState.INVITEABLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasPartyMembersAvailableForVoiceInvite() {
+        if (!VoiceChatIntegration.isVoiceChatLoaded() || this.currentParty == null || this.currentParty.getMembers() == null) {
+            return false;
+        }
+
+        if (!VoiceChatIntegration.hasLocalVoiceGroup()) {
+            for (UUID memberId : this.currentParty.getMembers()) {
+                if (memberId != null && !memberId.equals(getLocalPlayerId()) && findOnlinePlayer(memberId) != null) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        for (UUID memberId : this.currentParty.getMembers()) {
+            if (canInvitePartyMemberToVoice(memberId)) {
                 return true;
             }
         }
@@ -759,6 +1155,31 @@ public class PartyScreen extends Screen {
             pushToast(new TranslatableComponent("screen.vaultpartyui.toast_invited_favorites"), 0xA0E0A0);
         } else {
             pushToast(new TranslatableComponent("screen.vaultpartyui.toast_no_favorite_invites"), 0xB0B0B0);
+        }
+    }
+
+    private void invitePartyToVoiceGroup() {
+        if (!VoiceChatIntegration.isVoiceChatLoaded()) {
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_voicechat_missing"), 0xB0B0B0);
+            return;
+        }
+
+        if (VoiceChatIntegration.hasLocalVoiceGroup()) {
+            ClientTickEvents.invitePartyToVoiceGroupNow();
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft != null) {
+            minecraft.setScreen(new VoiceGroupCreateScreen(this));
+        }
+    }
+
+    private void leaveVoiceGroup() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) {
+            minecraft.player.chat("/voicechat leave");
+            pushToast(new TranslatableComponent("screen.vaultpartyui.toast_left_voice_group"), 0xE3C38C);
         }
     }
 
@@ -881,6 +1302,18 @@ public class PartyScreen extends Screen {
         // Base face + hat layer from the standard 64x64 skin texture.
         blit(poseStack, x, y, 8.0F, 8.0F, HEAD_SIZE, HEAD_SIZE, 64, 64);
         blit(poseStack, x, y, 40.0F, 8.0F, HEAD_SIZE, HEAD_SIZE, 64, 64);
+    }
+
+    private void drawVoiceGroupIcon(PoseStack poseStack, int x, int y) {
+        Objects.requireNonNull(poseStack, "poseStack");
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.setShaderTexture(0, VOICE_GROUP_ICON);
+        poseStack.pushPose();
+        poseStack.translate(x, y, 0.0D);
+        poseStack.scale(VOICE_ICON_SCALE, VOICE_ICON_SCALE, 1.0F);
+        blit(poseStack, 0, 0, 0.0F, 0.0F, 16, 16, 16, 16);
+        poseStack.popPose();
     }
 
     private ResourceLocation getPlayerSkin(UUID playerId) {

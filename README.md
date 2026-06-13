@@ -13,8 +13,20 @@ Client-side Forge mod for Vault Hunters (Minecraft 1.18.2) that provides a party
 - Online player list with per-player `Invite` / `Remove` actions.
 - Invite Favorites quick action for every available favorite player.
 - Optional keybinds for create/invite-all, create/invite-favorites, and invite-nearby.
+- Optional Simple Voice Chat integration when the voice chat mod is installed.
+- Invite your voice group to your Vault party, invite your party to voice chat, and see microphone icons for players in your current voice group.
 
 ## Changelog
+
+### 1.4
+
+- Added optional Simple Voice Chat integration.
+- Added voice group actions for inviting voice chat members to your Vault party.
+- Added party-to-voice-chat invites, including a create voice group screen when you are not already in a voice group.
+- Added microphone indicators for players in your current voice group.
+- Reworked the party panel so party members in your voice group are shown first.
+- Added per-player actions to invite party members to voice chat or voice group members to the Vault party.
+- Updated the top party controls with grouped Manage Party and Invite sections.
 
 ### 1.3
 

@@ -17,6 +17,8 @@ By default press `I` to open the UI. It can be changed in the key-bind settings.
 *   Auto-accept can be set to off, favorites only, or all.
 *   Invite Favorites quick action for every available favorite player.
 *   Optional keybinds for create/invite-all, create/invite-favorites, and invite-nearby.
+*   Optional Simple Voice Chat integration when the voice chat mod is installed.
+*   Invite your voice group to your Vault party, invite your party to voice chat, and see microphone icons for players in your current voice group.
 
 ## Why use it?
 
@@ -32,9 +34,19 @@ If you play Vault Hunters with friends, this mod makes party management much les
 
 *   This mod is client-side only.
 *   The server still controls party permissions and final command behavior.
-*   For best results, test it inside the Vault Hunters pack client.
+*   Simple Voice Chat support is optional. Vault Party UI can still run when the voice chat mod is not installed.
 
 ## Changelog
+
+### 1.4
+
+*   Added optional Simple Voice Chat integration.
+*   Added voice group actions for inviting voice chat members to your Vault party.
+*   Added party-to-voice-chat invites, including a create voice group screen when you are not already in a voice group.
+*   Added microphone indicators for players in your current voice group.
+*   Reworked the party panel so party members in your voice group are shown first.
+*   Added per-player actions to invite party members to voice chat or voice group members to the Vault party.
+*   Updated the top party controls with grouped Manage Party and Invite sections.
 
 ### 1.3
 
