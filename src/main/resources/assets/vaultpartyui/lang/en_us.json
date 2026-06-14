@@ -11,6 +11,10 @@
   "screen.vaultpartyui.target": "Player Name",
   "screen.vaultpartyui.search_hint": "Type a name to filter or invite",
   "screen.vaultpartyui.create": "Create Party",
+  "screen.vaultpartyui.restore_previous": "Restore Previous",
+  "screen.vaultpartyui.restore_previous_tooltip": "Re-invite previous party:",
+  "screen.vaultpartyui.update_available": "Update available",
+  "screen.vaultpartyui.update_available_tooltip": "Click to open the CurseForge page",
   "screen.vaultpartyui.leave": "Leave Party",
   "screen.vaultpartyui.leave_short": "Leave",
   "screen.vaultpartyui.leave_voice_short": "Leave VC",
@@ -64,6 +68,8 @@
   "screen.vaultpartyui.toast_no_favorite_invites": "No favorite players are available to invite",
   "screen.vaultpartyui.toast_favorite_added": "Added %s to favorites",
   "screen.vaultpartyui.toast_favorite_removed": "Removed %s from favorites",
+  "screen.vaultpartyui.toast_restored_previous_party": "Re-invited %s previous party members",
+  "screen.vaultpartyui.toast_no_previous_party": "No previous party members to invite",
   "screen.vaultpartyui.no_party": "You are not in a party.",
   "screen.vaultpartyui.no_target": "Type or select a player name first.",
   "screen.vaultpartyui.pending_invite": "Incoming invite from %s",
@@ -106,5 +112,5 @@
   "screen.vaultpartyui.toast_removed": "Removed %s",
   "screen.vaultpartyui.no_matching": "No matching players.",
   "screen.vaultpartyui.self": "You",
-  "screen.vaultpartyui.credit_tooltip": "Click to open the GitHub repo"
+  "screen.vaultpartyui.credit_tooltip": "Click to open Massuus on CurseForge"
 }

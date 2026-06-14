@@ -38,6 +38,14 @@ If you play Vault Hunters with friends, this mod makes party management much les
 
 ## Changelog
 
+### 1.5
+
+*   Added a Restore Previous button next to Create Party that recreates the last remembered party and re-invites previous members.
+*   Added a hover preview for Restore Previous showing who will be invited.
+*   Added a footer update indicator that checks GitHub releases and shows an Update available pill when a newer version exists.
+*   Updated footer links so the version opens the CurseForge mod page and Made by Massuus opens the CurseForge creator page.
+*   Split more party screen behavior into smaller renderer, controller, footer, snapshot, and update-checker helpers.
+
 ### 1.4
 
 *   Added optional Simple Voice Chat integration.

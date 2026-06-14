@@ -2,14 +2,19 @@ package dev.massuus.vaultpartyui.client.screen;
 
 import java.util.Objects;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import dev.massuus.vaultpartyui.client.ClientTickEvents;
 import dev.massuus.vaultpartyui.client.VoiceChatIntegration;
 import dev.massuus.vaultpartyui.client.VoiceChatIntegration.VoiceGroupType;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TranslatableComponent;
@@ -19,12 +24,13 @@ public class VoiceGroupCreateScreen extends Screen {
     private static final int PANEL_HEIGHT = 132;
     private static final int BUTTON_HEIGHT = 20;
 
+    @Nullable
     private final Screen parentScreen;
     private EditBox passwordBox;
     private Button typeButton;
     private VoiceGroupType selectedType = VoiceGroupType.OPEN;
 
-    public VoiceGroupCreateScreen(Screen parentScreen) {
+    public VoiceGroupCreateScreen(@Nullable Screen parentScreen) {
         super(new TranslatableComponent("screen.vaultpartyui.voice_group_create_title"));
         this.parentScreen = parentScreen;
     }
@@ -37,9 +43,9 @@ public class VoiceGroupCreateScreen extends Screen {
 
         this.passwordBox = new EditBox(Objects.requireNonNull(this.font), panelX + 12, panelY + 46, PANEL_WIDTH - 24, 20, new TranslatableComponent("screen.vaultpartyui.voice_group_password"));
         this.passwordBox.setMaxLength(24);
-        addRenderableWidget(this.passwordBox);
+        addRenderableWidget(Objects.requireNonNull(this.passwordBox));
 
-        this.typeButton = addRenderableWidget(new Button(panelX + 12, panelY + 74, PANEL_WIDTH - 24, BUTTON_HEIGHT, typeLabel(), button -> {
+        this.typeButton = addRenderableWidget(new Button(panelX + 12, panelY + 74, PANEL_WIDTH - 24, BUTTON_HEIGHT, Objects.requireNonNull(typeLabel()), button -> {
             this.selectedType = this.selectedType.next();
             updateTypeLabel();
         }));
@@ -58,8 +64,9 @@ public class VoiceGroupCreateScreen extends Screen {
     }
 
     @Override
-    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+    public void render(@Nonnull PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
         Objects.requireNonNull(poseStack, "poseStack");
+        Objects.requireNonNull(this.font, "font");
         renderBackground(poseStack);
         int panelX = panelX();
         int panelY = panelY();
@@ -69,7 +76,7 @@ public class VoiceGroupCreateScreen extends Screen {
         fill(poseStack, panelX, panelY, panelX + 1, panelY + PANEL_HEIGHT, 0xFFE3C38C);
         fill(poseStack, panelX + PANEL_WIDTH - 1, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0xFFE3C38C);
 
-        GuiComponent.drawCenteredString(poseStack, this.font, this.title, this.width / 2, panelY + 8, 0xFFFFFF);
+        GuiComponent.drawCenteredString(poseStack, Objects.requireNonNull(this.font), Objects.requireNonNull(this.title), this.width / 2, panelY + 8, 0xFFFFFF);
         Component name = new TranslatableComponent("screen.vaultpartyui.voice_group_name", "Vault Party");
         this.font.draw(poseStack, name, panelX + 12, panelY + 27, 0xE3C38C);
         super.render(poseStack, mouseX, mouseY, partialTick);
@@ -80,32 +87,35 @@ public class VoiceGroupCreateScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (this.minecraft != null) {
-            this.minecraft.setScreen(this.parentScreen);
+        Minecraft mc = this.minecraft;
+        if (mc != null) {
+            mc.setScreen(this.parentScreen);
         }
     }
 
     private void createAndInvite() {
         String password = this.passwordBox == null ? "" : this.passwordBox.getValue();
         boolean sent = VoiceChatIntegration.createVoiceGroup(password, this.selectedType);
-        if (this.minecraft != null && this.minecraft.player != null) {
+        Minecraft mc = this.minecraft;
+        LocalPlayer player = mc == null ? null : mc.player;
+        if (mc != null && player != null) {
             if (sent) {
                 ClientTickEvents.queueInvitePartyToVoiceGroup();
-                this.minecraft.player.displayClientMessage(new TranslatableComponent("screen.vaultpartyui.toast_creating_voice_group"), false);
-                this.minecraft.setScreen(this.parentScreen);
+                player.displayClientMessage(new TranslatableComponent("screen.vaultpartyui.toast_creating_voice_group"), false);
+                mc.setScreen(this.parentScreen);
             } else {
-                this.minecraft.player.displayClientMessage(new TranslatableComponent("screen.vaultpartyui.toast_voice_group_create_failed"), false);
+                player.displayClientMessage(new TranslatableComponent("screen.vaultpartyui.toast_voice_group_create_failed"), false);
             }
         }
     }
 
     private Component typeLabel() {
-        return new TranslatableComponent("screen.vaultpartyui.voice_group_type", new TranslatableComponent(this.selectedType.getLabelKey()));
+        return new TranslatableComponent("screen.vaultpartyui.voice_group_type", new TranslatableComponent(Objects.requireNonNull(this.selectedType.getLabelKey())));
     }
 
     private void updateTypeLabel() {
         if (this.typeButton != null) {
-            this.typeButton.setMessage(typeLabel());
+            this.typeButton.setMessage(Objects.requireNonNull(typeLabel()));
         }
     }
 

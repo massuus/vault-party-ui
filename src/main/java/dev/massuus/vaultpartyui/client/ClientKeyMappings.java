@@ -20,21 +20,21 @@ public final class ClientKeyMappings {
     public static final KeyMapping CREATE_AND_INVITE_ALL = new KeyMapping(
         "key.vaultpartyui.create_invite_all",
         InputConstants.Type.KEYSYM,
-        InputConstants.UNKNOWN.getValue(),
+        GLFW.GLFW_KEY_UNKNOWN,
         "key.categories.vaultpartyui"
     );
 
     public static final KeyMapping CREATE_AND_INVITE_FAVORITES = new KeyMapping(
         "key.vaultpartyui.create_invite_favorites",
         InputConstants.Type.KEYSYM,
-        InputConstants.UNKNOWN.getValue(),
+        GLFW.GLFW_KEY_UNKNOWN,
         "key.categories.vaultpartyui"
     );
 
     public static final KeyMapping INVITE_NEARBY = new KeyMapping(
         "key.vaultpartyui.invite_nearby_party",
         InputConstants.Type.KEYSYM,
-        InputConstants.UNKNOWN.getValue(),
+        GLFW.GLFW_KEY_UNKNOWN,
         "key.categories.vaultpartyui"
     );
 
