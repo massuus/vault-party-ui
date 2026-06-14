@@ -18,6 +18,12 @@ Client-side Forge mod for Vault Hunters (Minecraft 1.18.2) that provides a party
 
 ## Changelog
 
+### 1.5.1
+
+- Added scrollable party and online player lists so large parties no longer overflow the panels.
+- Added an in-memory player name and skin cache so offline party members keep their last seen name/head.
+- Offline party members now render gray and show `[Offline]`.
+
 ### 1.5
 
 - Added a Restore Previous button next to Create Party that recreates the last remembered party and re-invites previous members.

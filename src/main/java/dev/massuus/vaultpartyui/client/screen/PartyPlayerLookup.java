@@ -3,8 +3,12 @@ package dev.massuus.vaultpartyui.client.screen;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.annotation.Nullable;
@@ -19,10 +23,15 @@ import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.resources.ResourceLocation;
 
 final class PartyPlayerLookup {
+    private static final Map<UUID, String> KNOWN_NAMES = new HashMap<>();
+    private static final Map<UUID, ResourceLocation> KNOWN_SKINS = new HashMap<>();
+    private static final Set<UUID> ONLINE_IDS = new HashSet<>();
+
     private PartyPlayerLookup() {
     }
 
     static List<OnlinePlayer> gatherOnlinePlayers(@Nullable ClientPacketListener connection) {
+        ONLINE_IDS.clear();
         if (connection == null) {
             return Collections.emptyList();
         }
@@ -31,7 +40,15 @@ final class PartyPlayerLookup {
         for (PlayerInfo playerInfo : connection.getOnlinePlayers()) {
             GameProfile profile = playerInfo.getProfile();
             if (profile != null && profile.getId() != null && profile.getName() != null) {
-                players.add(new OnlinePlayer(profile.getId(), profile.getName()));
+                UUID playerId = profile.getId();
+                String playerName = profile.getName();
+                players.add(new OnlinePlayer(playerId, playerName));
+                ONLINE_IDS.add(playerId);
+                KNOWN_NAMES.put(playerId, playerName);
+                ResourceLocation skin = playerInfo.getSkinLocation();
+                if (skin != null) {
+                    KNOWN_SKINS.put(playerId, skin);
+                }
             }
         }
 
@@ -50,6 +67,16 @@ final class PartyPlayerLookup {
             return "offline";
         }
 
+        String debugName = PartyDebugData.resolveName(playerId);
+        if (debugName != null) {
+            return debugName;
+        }
+
+        String knownName = KNOWN_NAMES.get(playerId);
+        if (knownName != null && !knownName.isBlank()) {
+            return knownName;
+        }
+
         ClientPacketListener connection = Minecraft.getInstance().getConnection();
         if (connection == null) {
             return "offline";
@@ -62,6 +89,10 @@ final class PartyPlayerLookup {
             }
         }
         return "offline";
+    }
+
+    static boolean isPlayerOnline(@Nullable UUID playerId) {
+        return playerId != null && ONLINE_IDS.contains(playerId);
     }
 
     @Nullable
@@ -83,8 +114,16 @@ final class PartyPlayerLookup {
         if (connection != null) {
             PlayerInfo playerInfo = connection.getPlayerInfo(safeId);
             if (playerInfo != null) {
-                return playerInfo.getSkinLocation();
+                ResourceLocation skin = playerInfo.getSkinLocation();
+                if (skin != null) {
+                    KNOWN_SKINS.put(safeId, skin);
+                    return skin;
+                }
             }
+        }
+        ResourceLocation knownSkin = KNOWN_SKINS.get(safeId);
+        if (knownSkin != null) {
+            return knownSkin;
         }
         return DefaultPlayerSkin.getDefaultSkin(safeId);
     }

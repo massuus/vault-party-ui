@@ -3,7 +3,6 @@ package dev.massuus.vaultpartyui.client.screen;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
@@ -27,7 +26,7 @@ final class PartyScreenController {
     private final OnlinePlayersSupplier onlinePlayers;
     private final Map<UUID, Long> inviteCooldownUntilMs;
     private final long inviteCooldownMs;
-    private final BiConsumer<Component, Integer> pushToast;
+    private final ToastSink pushToast;
     private final Consumer<Component> showClientMessage;
 
     PartyScreenController(
@@ -36,7 +35,7 @@ final class PartyScreenController {
             OnlinePlayersSupplier onlinePlayers,
             Map<UUID, Long> inviteCooldownUntilMs,
             long inviteCooldownMs,
-            BiConsumer<Component, Integer> pushToast,
+            ToastSink pushToast,
             Consumer<Component> showClientMessage
     ) {
         this.owner = owner;
@@ -324,5 +323,10 @@ final class PartyScreenController {
     @FunctionalInterface
     interface OnlinePlayersSupplier {
         List<OnlinePlayer> get();
+    }
+
+    @FunctionalInterface
+    interface ToastSink {
+        void accept(@Nullable Component message, int color);
     }
 }

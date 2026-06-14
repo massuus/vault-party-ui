@@ -53,10 +53,9 @@ public class PartyScreen extends Screen {
     private static final int PANEL_HEIGHT = 246;
     private static final int PANEL_PADDING = 10;
     private static final int ONLINE_ROW_HEIGHT = PartyOnlinePanelRenderer.ROW_HEIGHT;
-    private static final int VISIBLE_ONLINE_ROWS = PartyOnlinePanelRenderer.VISIBLE_ROWS;
     private static final long INVITE_COOLDOWN_MS = 8000L;
     private static final int STATE_REFRESH_INTERVAL_TICKS = 4;
-    private static final String MOD_VERSION = "VPUI v1.5";
+    private static final String MOD_VERSION = "VPUI v1.5.1";
     private static final String CURSEFORGE_URL = "https://www.curseforge.com/minecraft/mc-mods/vault-party-ui";
     private static final String CURSEFORGE_AUTHOR_URL = "https://www.curseforge.com/members/massuus/projects";
     private static final String GITHUB_RELEASES_API_URL = "https://api.github.com/repos/massuus/vault-party-ui/releases/latest";
@@ -80,6 +79,7 @@ public class PartyScreen extends Screen {
     private Button acceptInviteButton;
     private Button declineInviteButton;
     private Button autoAcceptToggleButton;
+    private int partyScrollOffset;
     private int onlineScrollOffset;
     private int selectedOnlineIndex = -1;
     private int stateRefreshTicks;
@@ -183,6 +183,7 @@ public class PartyScreen extends Screen {
         renderActionGroupOutlines(poseStack);
 
         GuiComponent.drawCenteredString(poseStack, screenFont, Objects.requireNonNull(this.title), this.width / 2, 8, 0xFFFFFF);
+        GuiComponent.drawCenteredString(poseStack, screenFont, new TranslatableComponent("screen.vaultpartyui.party"), leftPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
         GuiComponent.drawCenteredString(poseStack, screenFont, new TranslatableComponent("screen.vaultpartyui.players"), rightPanelX + panelWidth / 2, PANEL_TOP + 6, 0xE3C38C);
 
         if (ClientPartyInviteState.hasPendingInvite()) {
@@ -236,19 +237,27 @@ public class PartyScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollDelta) {
-        if (!isInsideOnlinePanel(mouseX, mouseY)) {
-            return super.mouseScrolled(mouseX, mouseY, scrollDelta);
-        }
-
-        List<OnlineRow> visiblePlayers = filteredOnlineRows();
-        int maxOffset = Math.max(0, visiblePlayers.size() - VISIBLE_ONLINE_ROWS);
-        if (maxOffset == 0) {
+        int direction = scrollDelta > 0 ? -1 : 1;
+        if (isInsidePartyPanel(mouseX, mouseY)) {
+            int maxOffset = maxPartyScrollOffset();
+            if (maxOffset == 0) {
+                return true;
+            }
+            this.partyScrollOffset = Mth.clamp(this.partyScrollOffset + direction, 0, maxOffset);
             return true;
         }
 
-        int direction = scrollDelta > 0 ? -1 : 1;
-        this.onlineScrollOffset = Mth.clamp(this.onlineScrollOffset + direction, 0, maxOffset);
-        return true;
+        if (isInsideOnlinePanel(mouseX, mouseY)) {
+            List<OnlineRow> visiblePlayers = filteredOnlineRows();
+            int maxOffset = Math.max(0, visiblePlayers.size() - PartyOnlinePanelRenderer.visibleRows());
+            if (maxOffset == 0) {
+                return true;
+            }
+            this.onlineScrollOffset = Mth.clamp(this.onlineScrollOffset + direction, 0, maxOffset);
+            return true;
+        }
+
+        return super.mouseScrolled(mouseX, mouseY, scrollDelta);
     }
 
     @Override
@@ -302,22 +311,32 @@ public class PartyScreen extends Screen {
 
     private void rebuildState() {
         Minecraft client = Minecraft.getInstance();
+        if (client == null) {
+            this.currentParty = null;
+            this.onlinePlayers = Collections.emptyList();
+            this.partyScrollOffset = 0;
+            this.onlineScrollOffset = 0;
+            this.selectedOnlineIndex = -1;
+            return;
+        }
         LocalPlayer player = client.player;
         if (player == null) {
             this.currentParty = null;
             this.onlinePlayers = Collections.emptyList();
+            this.partyScrollOffset = 0;
             this.onlineScrollOffset = 0;
             this.selectedOnlineIndex = -1;
             return;
         }
 
-        this.currentParty = ClientPartyData.getParty(player.getUUID());
-        this.onlinePlayers = PartyPlayerLookup.gatherOnlinePlayers(client.getConnection());
+        this.currentParty = PartyDebugData.partyForDisplay(ClientPartyData.getParty(player.getUUID()), player.getUUID());
+        this.onlinePlayers = PartyDebugData.onlinePlayersForDisplay(PartyPlayerLookup.gatherOnlinePlayers(client.getConnection()));
         PreviousPartySnapshot.remember(this.currentParty, this.onlinePlayers, player.getUUID());
 
         List<OnlineRow> visiblePlayers = filteredOnlineRows();
-        int maxOffset = Math.max(0, visiblePlayers.size() - VISIBLE_ONLINE_ROWS);
+        int maxOffset = Math.max(0, visiblePlayers.size() - PartyOnlinePanelRenderer.visibleRows());
         this.onlineScrollOffset = Mth.clamp(this.onlineScrollOffset, 0, maxOffset);
+        this.partyScrollOffset = Mth.clamp(this.partyScrollOffset, 0, maxPartyScrollOffset());
         if (visiblePlayers.isEmpty()) {
             this.selectedOnlineIndex = -1;
         } else {
@@ -337,7 +356,8 @@ public class PartyScreen extends Screen {
 
         List<OnlinePlayer> filtered = new ArrayList<>();
         for (OnlinePlayer player : this.onlinePlayers) {
-            if (player.name.toLowerCase(Locale.ROOT).contains(filter)) {
+            String playerName = player == null || player.name == null ? "" : player.name;
+            if (playerName.toLowerCase(Locale.ROOT).contains(filter)) {
                 filtered.add(player);
             }
         }
@@ -471,9 +491,13 @@ public class PartyScreen extends Screen {
     }
 
     private boolean shouldShowPendingInviteActions() {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null) {
+            return false;
+        }
         return ClientPartyInviteState.hasPendingInvite()
                 && this.currentParty == null
-                && !ClientPartySettings.shouldAutoAcceptInvite(Minecraft.getInstance(), ClientPartyInviteState.getInviterName());
+                && !ClientPartySettings.shouldAutoAcceptInvite(client, ClientPartyInviteState.getInviterName());
     }
 
     private void renderActionGroupOutlines(@Nonnull PoseStack poseStack) {
@@ -507,9 +531,11 @@ public class PartyScreen extends Screen {
         fill(poseStack, x1, y1, x1 + 1, y2 + 1, 0xFFE3C38C);
         fill(poseStack, x2 - 1, y1, x2, y2 + 1, 0xFFE3C38C);
         String text = Objects.requireNonNull(label.getString());
-        int labelX = x1 + (x2 - x1) / 2 - this.font.width(text) / 2;
-        fill(poseStack, labelX - 3, y1 - 4, labelX + this.font.width(text) + 3, y1 + 7, 0xFF111111);
-        this.font.draw(poseStack, text, labelX, y1 - 3, 0xE3C38C);
+        Font screenFont = Objects.requireNonNull(this.font, "font");
+        int labelWidth = screenFont.width(text);
+        int labelX = x1 + (x2 - x1) / 2 - labelWidth / 2;
+        fill(poseStack, labelX - 3, y1 - 4, labelX + labelWidth + 3, y1 + 7, 0xFF111111);
+        screenFont.draw(poseStack, text, labelX, y1 - 3, 0xE3C38C);
     }
 
     private Component autoAcceptToggleLabel() {
@@ -523,7 +549,7 @@ public class PartyScreen extends Screen {
     }
 
     private void renderPartyPanel(@Nonnull PoseStack poseStack, int panelX, int panelWidth, int mouseX, int mouseY) {
-        PartyPanelRenderer.render(
+        PartyPanelRenderState state = PartyPanelRenderer.render(
                 poseStack,
                 Objects.requireNonNull(this.font),
                 panelX,
@@ -533,11 +559,13 @@ public class PartyScreen extends Screen {
                 this.currentParty,
                 sortedPartyMembers(),
                 voiceGroupRowsNotInParty(),
+                this.partyScrollOffset,
                 this.controller.isPartyLeader(),
                 this.controller::canInvitePartyMemberToVoice,
                 this.controller::canJoinPartyMemberVoiceGroup,
                 this::queueTooltip
         );
+        this.partyScrollOffset = state.scrollOffset;
     }
 
     private void renderOnlinePanel(@Nonnull PoseStack poseStack, int panelX, int panelWidth, int mouseX, int mouseY) {
@@ -615,6 +643,9 @@ public class PartyScreen extends Screen {
 
         OnlineRow row = visiblePlayers.get(index);
         OnlinePlayer player = row.player;
+        if (player == null) {
+            return true;
+        }
         int actionY = PartyOnlinePanelRenderer.rowY(index, this.onlineScrollOffset);
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
         int actionX = PartyOnlinePanelRenderer.actionX(panelX, panelWidth);
@@ -645,30 +676,31 @@ public class PartyScreen extends Screen {
             return true;
         }
 
-        int rowY = PANEL_TOP + 40;
-        for (UUID memberId : sortedPartyMembers()) {
-            if (mouseY >= rowY - 2 && mouseY <= rowY + ONLINE_ROW_HEIGHT - 2) {
-                if (this.controller.canInvitePartyMemberToVoice(memberId)) {
-                    this.controller.invitePlayerToVoiceGroup(memberId);
-                } else if (this.controller.canJoinPartyMemberVoiceGroup(memberId)) {
-                    this.controller.joinPartyMemberVoiceGroup(memberId);
-                }
-                return true;
-            }
-            rowY += ONLINE_ROW_HEIGHT;
+        int relativeY = (int)mouseY - PartyPanelRenderer.listTop();
+        int rowIndex = this.partyScrollOffset + (relativeY / PartyPanelRenderer.ROW_HEIGHT);
+        List<UUID> members = sortedPartyMembers();
+        List<OnlineRow> voiceRows = voiceGroupRowsNotInParty();
+        if (rowIndex < 0 || rowIndex >= PartyPanelRenderer.totalRows(members, voiceRows)) {
+            return true;
         }
 
-        List<OnlineRow> voiceRows = voiceGroupRowsNotInParty();
+        if (rowIndex < members.size()) {
+            UUID memberId = members.get(rowIndex);
+            if (this.controller.canInvitePartyMemberToVoice(memberId)) {
+                this.controller.invitePlayerToVoiceGroup(memberId);
+            } else if (this.controller.canJoinPartyMemberVoiceGroup(memberId)) {
+                this.controller.joinPartyMemberVoiceGroup(memberId);
+            }
+            return true;
+        }
+
         if (!voiceRows.isEmpty()) {
-            rowY += 22;
-            for (OnlineRow row : voiceRows) {
-                if (mouseY >= rowY - 2 && mouseY <= rowY + ONLINE_ROW_HEIGHT - 2) {
-                    if (row.state == RowState.INVITEABLE) {
-                        this.controller.performPrimaryRowAction(row);
-                    }
-                    return true;
+            int voiceRowIndex = rowIndex - members.size();
+            if (voiceRowIndex > 0) {
+                int listIndex = voiceRowIndex - 1;
+                if (listIndex >= 0 && listIndex < voiceRows.size() && voiceRows.get(listIndex).state == RowState.INVITEABLE) {
+                    this.controller.performPrimaryRowAction(voiceRows.get(listIndex));
                 }
-                rowY += ONLINE_ROW_HEIGHT;
             }
         }
 
@@ -729,12 +761,17 @@ public class PartyScreen extends Screen {
         if (this.selectedOnlineIndex < this.onlineScrollOffset) {
             this.onlineScrollOffset = this.selectedOnlineIndex;
         }
-        int maxVisible = this.onlineScrollOffset + VISIBLE_ONLINE_ROWS - 1;
+        int visibleRows = PartyOnlinePanelRenderer.visibleRows();
+        int maxVisible = this.onlineScrollOffset + visibleRows - 1;
         if (this.selectedOnlineIndex > maxVisible) {
-            this.onlineScrollOffset = this.selectedOnlineIndex - VISIBLE_ONLINE_ROWS + 1;
+            this.onlineScrollOffset = this.selectedOnlineIndex - visibleRows + 1;
         }
-        int maxOffset = Math.max(0, rowCount - VISIBLE_ONLINE_ROWS);
+        int maxOffset = Math.max(0, rowCount - visibleRows);
         this.onlineScrollOffset = Mth.clamp(this.onlineScrollOffset, 0, maxOffset);
+    }
+
+    private int maxPartyScrollOffset() {
+        return Math.max(0, PartyPanelRenderer.totalRows(sortedPartyMembers(), voiceGroupRowsNotInParty()) - PartyPanelRenderer.visibleRows());
     }
 
     private void pruneTransientState() {

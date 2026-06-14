@@ -21,8 +21,7 @@ import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.util.Mth;
 
 final class PartyOnlinePanelRenderer {
-    static final int ROW_HEIGHT = 14;
-    static final int VISIBLE_ROWS = 15;
+    static final int ROW_HEIGHT = 12;
     static final int STAR_SIZE = 8;
 
     private static final int PANEL_TOP = 58;
@@ -48,17 +47,18 @@ final class PartyOnlinePanelRenderer {
         int textX = panelX + 10;
         int listTop = listTop();
         int listHeight = listHeight();
+        int visibleRows = visibleRows();
 
         GuiComponent.fill(poseStack, panelX + 8, PANEL_TOP + 20, panelX + panelWidth - 8, PANEL_TOP + 42, 0xAA1A1A1A);
         String targetLabel = Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.target").getString());
         font.draw(poseStack, targetLabel, textX, PANEL_TOP + 24, 0xA0A0A0);
 
-        int maxOffset = Math.max(0, visiblePlayers.size() - VISIBLE_ROWS);
+        int maxOffset = Math.max(0, visiblePlayers.size() - visibleRows);
         int clampedOffset = Mth.clamp(scrollOffset, 0, maxOffset);
         int clampedSelected = visiblePlayers.isEmpty() ? -1 : Mth.clamp(selectedIndex, 0, visiblePlayers.size() - 1);
 
         int startIndex = clampedOffset;
-        int endIndex = Math.min(visiblePlayers.size(), startIndex + VISIBLE_ROWS);
+        int endIndex = Math.min(visiblePlayers.size(), startIndex + visibleRows);
 
         GuiComponent.fill(poseStack, panelX + 8, listTop, panelX + panelWidth - 8, listTop + listHeight, 0x66111111);
         GuiComponent.fill(poseStack, panelX + 8, listTop, panelX + panelWidth - 8, listTop + 1, 0xFFE3C38C);
@@ -76,6 +76,8 @@ final class PartyOnlinePanelRenderer {
             rowY += ROW_HEIGHT;
         }
 
+        renderScrollHint(poseStack, panelX, panelWidth, listTop, listHeight, visiblePlayers.size(), clampedOffset, visibleRows);
+
         return new OnlinePanelRenderState(clampedOffset, clampedSelected);
     }
 
@@ -89,6 +91,12 @@ final class PartyOnlinePanelRenderer {
 
     static int rowY(int listIndex, int scrollOffset) {
         return listTop() + (listIndex - scrollOffset) * ROW_HEIGHT + 4;
+    }
+
+    static int visibleRows() {
+        int rowTopPadding = 4;
+        int rowDrawHeight = ROW_HEIGHT - 2;
+        return Math.max(1, 1 + Math.max(0, listHeight() - rowTopPadding - rowDrawHeight) / ROW_HEIGHT);
     }
 
     static boolean isFavoriteToggleHovered(double mouseX, double mouseY, int starX, int rowY) {
@@ -162,10 +170,36 @@ final class PartyOnlinePanelRenderer {
     private static int listHeight() {
         int panelBottom = PANEL_TOP + PANEL_HEIGHT;
         int top = listTop();
-        return Math.min(VISIBLE_ROWS * ROW_HEIGHT + 6, Math.max(0, panelBottom - top - 8));
+        return Math.max(0, panelBottom - top - 2);
     }
 
     static int actionX(int panelX, int panelWidth) {
         return panelX + panelWidth - 110;
+    }
+
+    private static void renderScrollHint(
+            @Nonnull PoseStack poseStack,
+            int panelX,
+            int panelWidth,
+            int listTop,
+            int listHeight,
+            int rowCount,
+            int scrollOffset,
+            int visibleRows
+    ) {
+        if (rowCount <= visibleRows) {
+            return;
+        }
+
+        int trackX = panelX + panelWidth - 11;
+        int trackTop = listTop + 4;
+        int trackBottom = listTop + listHeight - 4;
+        int trackHeight = Math.max(1, trackBottom - trackTop);
+        GuiComponent.fill(poseStack, trackX, trackTop, trackX + 2, trackBottom, 0x66333333);
+
+        int thumbHeight = Math.max(12, trackHeight * visibleRows / rowCount);
+        int maxOffset = Math.max(1, rowCount - visibleRows);
+        int thumbY = trackTop + (trackHeight - thumbHeight) * scrollOffset / maxOffset;
+        GuiComponent.fill(poseStack, trackX, thumbY, trackX + 2, thumbY + thumbHeight, 0xFFE3C38C);
     }
 }

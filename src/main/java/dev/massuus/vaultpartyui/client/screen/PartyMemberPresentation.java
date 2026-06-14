@@ -24,6 +24,9 @@ final class PartyMemberPresentation {
         if (memberId != null && memberId.equals(localPlayerId)) {
             line.append(" [").append(Objects.requireNonNull(new TranslatableComponent("screen.vaultpartyui.self").getString())).append("]");
         }
+        if (memberId != null && !memberId.equals(localPlayerId) && !PartyPlayerLookup.isPlayerOnline(memberId)) {
+            line.append(" [").append(new TranslatableComponent("screen.vaultpartyui.offline").getString()).append("]");
+        }
 
         PartyMember cachedMember = ClientPartyData.getCachedMember(memberId);
         if (cachedMember != null) {
@@ -36,6 +39,10 @@ final class PartyMemberPresentation {
     }
 
     static int color(@Nullable UUID memberId) {
+        if (memberId != null && !PartyPlayerLookup.isPlayerOnline(memberId)) {
+            return 0x808080;
+        }
+
         PartyMember cachedMember = ClientPartyData.getCachedMember(memberId);
         return cachedMember == null ? 0xFFFFFF : statusColor(cachedMember.status);
     }
