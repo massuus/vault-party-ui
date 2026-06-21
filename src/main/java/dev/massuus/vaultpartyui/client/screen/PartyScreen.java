@@ -55,7 +55,7 @@ public class PartyScreen extends Screen {
     private static final int ONLINE_ROW_HEIGHT = PartyOnlinePanelRenderer.ROW_HEIGHT;
     private static final long INVITE_COOLDOWN_MS = 8000L;
     private static final int STATE_REFRESH_INTERVAL_TICKS = 4;
-    private static final String MOD_VERSION = "VPUI v1.5.1";
+    private static final String MOD_VERSION = "VPUI v1.5.2";
     private static final String CURSEFORGE_URL = "https://www.curseforge.com/minecraft/mc-mods/vault-party-ui";
     private static final String CURSEFORGE_AUTHOR_URL = "https://www.curseforge.com/members/massuus/projects";
     private static final String GITHUB_RELEASES_API_URL = "https://api.github.com/repos/massuus/vault-party-ui/releases/latest";
@@ -125,9 +125,9 @@ public class PartyScreen extends Screen {
         this.disbandPartyButton = addRenderableWidget(new Button(leftRowX + MANAGE_BUTTON_WIDTH + BUTTON_GAP, ACTION_BUTTON_Y, MANAGE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.disband_short"), button -> this.controller.confirmDisbandParty()));
         this.leaveVoiceGroupButton = addRenderableWidget(new Button(leftRowX + (MANAGE_BUTTON_WIDTH + BUTTON_GAP) * 2, ACTION_BUTTON_Y, LEAVE_VOICE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.leave_voice_short"), button -> this.controller.leaveVoiceGroup()));
 
-        this.inviteNearbyButton = addRenderableWidget(new Button(rightRowX, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby_short"), button -> this.controller.sendPartyCommand("party invite nearby")));
-        this.inviteAllButton = addRenderableWidget(new Button(rightRowX + INVITE_BUTTON_WIDTH + BUTTON_GAP, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all_short"), button -> this.controller.sendPartyCommand("party invite all")));
-        this.inviteFavoritesButton = addRenderableWidget(new Button(rightRowX + (INVITE_BUTTON_WIDTH + BUTTON_GAP) * 2, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_favorites_short"), button -> this.controller.inviteFavoritePlayers()));
+        this.inviteNearbyButton = addRenderableWidget(new Button(rightRowX, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_nearby_short"), button -> ClientTickEvents.triggerInviteNearbyAction()));
+        this.inviteAllButton = addRenderableWidget(new Button(rightRowX + INVITE_BUTTON_WIDTH + BUTTON_GAP, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_all_short"), button -> ClientTickEvents.triggerCreateAndInviteAllAction()));
+        this.inviteFavoritesButton = addRenderableWidget(new Button(rightRowX + (INVITE_BUTTON_WIDTH + BUTTON_GAP) * 2, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_favorites_short"), button -> ClientTickEvents.triggerCreateAndInviteFavoritesAction()));
         this.inviteVoiceGroupButton = addRenderableWidget(new Button(rightRowX + (INVITE_BUTTON_WIDTH + BUTTON_GAP) * 3, ACTION_BUTTON_Y, INVITE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_voice_group_short"), button -> ClientTickEvents.triggerVoiceGroupPartyAction()));
         this.invitePartyVoiceGroupButton = addRenderableWidget(new Button(20, this.height - BUTTON_HEIGHT * 2 - 12, BULK_VOICE_BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("screen.vaultpartyui.invite_party_voice_group"), button -> this.controller.invitePartyToVoiceGroup()));
 
@@ -387,6 +387,8 @@ public class PartyScreen extends Screen {
     private void updateActionVisibility() {
         boolean inParty = this.controller.isLocalPlayerInParty();
         boolean hasInvite = shouldShowPendingInviteActions();
+        boolean showSoloInviteActions = !inParty && !hasInvite;
+        boolean showInviteActions = inParty || showSoloInviteActions;
         boolean hasPreviousParty = !PreviousPartySnapshot.members().isEmpty();
         int panelWidth = (this.width - 40 - PANEL_PADDING) / 2;
         int leftPanelX = 20;
@@ -396,7 +398,7 @@ public class PartyScreen extends Screen {
             this.createPartyButton.visible = !inParty;
             boolean showRestorePrevious = !inParty && !hasInvite && hasPreviousParty && this.restorePreviousPartyButton != null;
             int rowWidth = showRestorePrevious ? BUTTON_WIDTH + BUTTON_GAP + RESTORE_BUTTON_WIDTH : BUTTON_WIDTH;
-            int createX = this.width / 2 - (rowWidth / 2);
+            int createX = leftPanelX + panelWidth / 2 - (rowWidth / 2);
             this.createPartyButton.x = createX;
             if (this.restorePreviousPartyButton != null) {
                 this.restorePreviousPartyButton.visible = showRestorePrevious;
@@ -413,6 +415,9 @@ public class PartyScreen extends Screen {
                 this.declineInviteButton.x = createX + BUTTON_WIDTH + BUTTON_GAP;
                 this.declineInviteButton.y = this.createPartyButton.y;
             }
+        } else if (this.restorePreviousPartyButton != null) {
+            this.restorePreviousPartyButton.visible = false;
+            this.restorePreviousPartyButton.active = false;
         }
         if (this.leavePartyButton != null) {
             this.leavePartyButton.visible = inParty;
@@ -440,18 +445,20 @@ public class PartyScreen extends Screen {
         }
 
         if (this.inviteNearbyButton != null) {
-            this.inviteNearbyButton.visible = inParty;
+            this.inviteNearbyButton.visible = showInviteActions;
+            this.inviteNearbyButton.active = showInviteActions;
         }
         if (this.inviteAllButton != null) {
-            this.inviteAllButton.visible = inParty;
+            this.inviteAllButton.visible = showInviteActions;
+            this.inviteAllButton.active = showInviteActions;
         }
         if (this.inviteFavoritesButton != null) {
-            this.inviteFavoritesButton.visible = inParty;
-            this.inviteFavoritesButton.active = inParty && this.controller.hasInviteableFavorites();
+            this.inviteFavoritesButton.visible = showInviteActions;
+            this.inviteFavoritesButton.active = showInviteActions && (inParty ? this.controller.hasInviteableFavorites() : this.controller.hasOnlineFavorites());
         }
         if (this.inviteVoiceGroupButton != null) {
-            this.inviteVoiceGroupButton.visible = inParty && VoiceChatIntegration.hasLocalVoiceGroup();
-            this.inviteVoiceGroupButton.active = this.inviteVoiceGroupButton.visible && this.controller.hasInviteableVoiceGroupPlayersForParty(voiceGroupRowsNotInParty());
+            this.inviteVoiceGroupButton.visible = showInviteActions && VoiceChatIntegration.hasLocalVoiceGroup();
+            this.inviteVoiceGroupButton.active = this.inviteVoiceGroupButton.visible && (inParty ? this.controller.hasInviteableVoiceGroupPlayersForParty(voiceGroupRowsNotInParty()) : !VoiceChatIntegration.getLocalVoiceGroupMemberIds().isEmpty());
         }
         if (this.invitePartyVoiceGroupButton != null) {
             this.invitePartyVoiceGroupButton.visible = inParty && VoiceChatIntegration.isVoiceChatLoaded();
@@ -502,14 +509,12 @@ public class PartyScreen extends Screen {
 
     private void renderActionGroupOutlines(@Nonnull PoseStack poseStack) {
         Objects.requireNonNull(poseStack, "poseStack");
-        if (!this.controller.isLocalPlayerInParty()) {
-            return;
+        if (this.controller.isLocalPlayerInParty()) {
+            Button lastManageButton = this.leaveVoiceGroupButton != null && this.leaveVoiceGroupButton.visible
+                    ? this.leaveVoiceGroupButton
+                    : this.disbandPartyButton;
+            renderButtonGroupOutline(poseStack, this.leavePartyButton, lastManageButton, new TranslatableComponent("screen.vaultpartyui.manage_party"));
         }
-
-        Button lastManageButton = this.leaveVoiceGroupButton != null && this.leaveVoiceGroupButton.visible
-                ? this.leaveVoiceGroupButton
-                : this.disbandPartyButton;
-        renderButtonGroupOutline(poseStack, this.leavePartyButton, lastManageButton, new TranslatableComponent("screen.vaultpartyui.manage_party"));
 
         Button lastInviteButton = this.inviteVoiceGroupButton != null && this.inviteVoiceGroupButton.visible
                 ? this.inviteVoiceGroupButton

@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
+import dev.massuus.vaultpartyui.client.ClientFavoritePlayers;
 import dev.massuus.vaultpartyui.client.ClientTickEvents;
 import dev.massuus.vaultpartyui.client.VoiceChatIntegration;
 import iskallia.vault.client.data.ClientPartyInviteState;
@@ -170,6 +171,20 @@ final class PartyScreenController {
 
         for (OnlineRow row : rows) {
             if (row.favorite && row.state == RowState.INVITEABLE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean hasOnlineFavorites() {
+        UUID localPlayerId = PartyPlayerLookup.getLocalPlayerId();
+        Party party = this.currentParty.get();
+        for (OnlinePlayer player : this.onlinePlayers.get()) {
+            if (player == null || player.id == null || player.id.equals(localPlayerId)) {
+                continue;
+            }
+            if (ClientFavoritePlayers.isFavorite(player.id) && !PartyRosterService.isPlayerInOtherParty(party, player.id)) {
                 return true;
             }
         }

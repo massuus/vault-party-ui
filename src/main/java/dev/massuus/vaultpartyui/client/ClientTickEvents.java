@@ -37,6 +37,18 @@ public final class ClientTickEvents {
         triggerQuickPartyAction(Minecraft.getInstance(), QuickPartyAction.INVITE_VOICE_GROUP);
     }
 
+    public static void triggerCreateAndInviteAllAction() {
+        triggerQuickPartyAction(Minecraft.getInstance(), QuickPartyAction.CREATE_AND_INVITE_ALL);
+    }
+
+    public static void triggerCreateAndInviteFavoritesAction() {
+        triggerQuickPartyAction(Minecraft.getInstance(), QuickPartyAction.CREATE_AND_INVITE_FAVORITES);
+    }
+
+    public static void triggerInviteNearbyAction() {
+        triggerQuickPartyAction(Minecraft.getInstance(), QuickPartyAction.INVITE_NEARBY);
+    }
+
     public static void queueInvitePartyToVoiceGroup() {
         pendingVoiceGroupInviteTicks = 100;
     }
