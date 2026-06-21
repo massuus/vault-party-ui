@@ -18,6 +18,10 @@ Client-side Forge mod for Vault Hunters (Minecraft 1.18.2) that provides a party
 
 ## Changelog
 
+### 1.5.2
+
+- Invite buttons are now available when you are not in a party; they create the party and run the invite action in one click.
+
 ### 1.5.1
 
 - Added scrollable party and online player lists so large parties no longer overflow the panels.

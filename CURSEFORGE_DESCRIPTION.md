@@ -38,6 +38,10 @@ If you play Vault Hunters with friends, this mod makes party management much les
 
 ## Changelog
 
+### 1.5.2
+
+*   Invite buttons are now available when you are not in a party; they create the party and run the invite action in one click.
+
 ### 1.5.1
 
 *   Added scrollable party and online player lists so large parties no longer overflow the panels.
